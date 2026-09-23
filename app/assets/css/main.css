@@ -25,7 +25,8 @@
   --color-ring: var(--ring);
 
   /* 引脚类型语义色（docs/04-ui-design.md §1） */
-  --color-pin-io: var(--pin-io);
+  --color-pin-gpio: var(--pin-gpio);
+  --color-pin-clock: var(--pin-clock);
   --color-pin-power: var(--pin-power);
   --color-pin-ground: var(--pin-ground);
   --color-pin-reset: var(--pin-reset);
@@ -63,7 +64,8 @@
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
 
-  --pin-io: oklch(0.52 0.05 250);
+  --pin-gpio: oklch(0.52 0.05 250);
+  --pin-clock: oklch(0.6 0.11 95);
   --pin-power: oklch(0.55 0.2 25);
   --pin-ground: oklch(0.35 0 0);
   --pin-reset: oklch(0.62 0.16 60);
@@ -94,7 +96,8 @@
   --input: oklch(1 0 0 / 16%);
   --ring: oklch(0.556 0 0);
 
-  --pin-io: oklch(0.72 0.06 250);
+  --pin-gpio: oklch(0.72 0.06 250);
+  --pin-clock: oklch(0.8 0.12 95);
   --pin-power: oklch(0.7 0.18 25);
   --pin-ground: oklch(0.62 0 0);
   --pin-reset: oklch(0.78 0.15 60);

@@ -22,6 +22,8 @@ export interface LabelPolicy {
   axisFont: number
   /** 是否画 pad 名（行距不够就不画，避免压叠） */
   showPadName: boolean
+  /** 是否画引脚号：行距过小（每边 40+ 脚）时连号也不画，靠 hover / Navigator 读 */
+  showNumber: boolean
   /** 是否在球上写球号（格子太小就不写，靠行列坐标头 + 悬停读） */
   showBallText: boolean
   /** pad 名可用宽度（本体一半再留白），超了截断 */
@@ -61,6 +63,8 @@ export function labelPolicy(input: LabelPolicyInput): LabelPolicy {
     axisFont: clamp(cell * 0.5, 10, 20),
     // 24 单位以下画 pad 名就会和相邻行贴上（LQFP100 每边 25 脚 → 行距 23.2）
     showPadName: pitch >= 26 && showPadLabels !== false,
+    // 行距 14 以下文字高约 16 > 行距，必然叠；这类封装（如 LQFP208 每边 52 脚）只画引脚块
+    showNumber: pitch >= 14,
     // 球号最长 3~4 字符，需要 ~2.4×字号宽度
     showBallText: cell >= 26,
     padMaxWidth: body.width / 2 - 24,

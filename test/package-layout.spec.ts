@@ -9,7 +9,7 @@ function linearPins(n: number): Pin[] {
     position: String(i + 1),
     pad: `P${i + 1}`,
     name: `P${i + 1}`,
-    type: 'io' as const,
+    type: 'gpio' as const,
     functions: [],
   }))
 }
@@ -20,7 +20,7 @@ function gridPins(rows: number, cols: number): Pin[] {
   for (let r = 0; r < rows; r++) {
     for (let c = 1; c <= cols; c++) {
       const position = `${ROW_LETTERS[r]}${c}`
-      out.push({ position, pad: position, name: position, type: 'io', functions: [] })
+      out.push({ position, pad: position, name: position, type: 'gpio', functions: [] })
     }
   }
   return out
@@ -123,7 +123,7 @@ describe('grid（BGA/WLCSP）：行列取极值，行字母跳过 JEDEC 保留�
         const position = `${letters[r]}${c}`
         // 去掉 9 个球，模拟真实稀疏矩阵
         if (pins.length < 216) {
-          pins.push({ position, pad: position, name: position, type: 'io', functions: [] })
+          pins.push({ position, pad: position, name: position, type: 'gpio', functions: [] })
         }
       }
     }
@@ -140,7 +140,7 @@ describe('grid（BGA/WLCSP）：行列取极值，行字母跳过 JEDEC 保留�
       position,
       pad: position,
       name: position,
-      type: 'io' as const,
+      type: 'gpio' as const,
       functions: [],
     }))
     const result = layoutPackage({ kind: 'grid', pins })
@@ -154,8 +154,8 @@ describe('grid（BGA/WLCSP）：行列取极值，行字母跳过 JEDEC 保留�
 
   it('列号从 position 取，不按引脚个数推', () => {
     const pins: Pin[] = [
-      { position: 'A1', pad: 'A1', name: 'A1', type: 'io', functions: [] },
-      { position: 'B7', pad: 'B7', name: 'B7', type: 'io', functions: [] },
+      { position: 'A1', pad: 'A1', name: 'A1', type: 'gpio', functions: [] },
+      { position: 'B7', pad: 'B7', name: 'B7', type: 'gpio', functions: [] },
     ]
     const result = layoutPackage({ kind: 'grid', pins })
     expect(result.meta.cols).toBe(7)

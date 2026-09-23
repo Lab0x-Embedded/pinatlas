@@ -4,7 +4,7 @@ import { strings } from '~/constants/strings'
 import { cn } from '~/lib/utils'
 import { fitText, labelPolicy } from '~/utils/label-policy'
 import { bodyRect, layoutPackage, sortedRowLabels, VIEW } from '~/utils/package-layout'
-import { functionLabel, PIN_TYPE_FILL, PIN_TYPE_LABEL, PIN_TYPE_ORDER, PIN_TYPE_TEXT } from '~/utils/pin-types'
+import { functionLabel, PIN_TYPE_FILL, PIN_TYPE_LABEL, PIN_TYPE_ORDER, PIN_TYPE_TEXT, pinAliases, pinPrimary } from '~/utils/pin-types'
 
 /**
  * 引脚图：SVG。
@@ -118,12 +118,18 @@ function labelStyle(slot: PinSlot) {
   }
 }
 
+/** 图上只画主名（v1.1.0 的 primary；旧数据现场拆分），别名与变体标注交给 hover / Inspector */
 function padText(slot: PinSlot) {
   const pin = pinsByPosition.value.get(slot.position)
-  if (!pin?.pad) {
+  if (!pin) {
     return ''
   }
-  return fitText(pin.pad, policy.value.padMaxWidth, policy.value.padFont)
+  return fitText(pinPrimary(pin), policy.value.padMaxWidth, policy.value.padFont)
+}
+
+function slotLabel(slot: PinSlot) {
+  const pin = pinsByPosition.value.get(slot.position)
+  return pin ? pinPrimary(pin) : slot.position
 }
 
 function onEnter(position: string, event: MouseEvent) {
@@ -219,7 +225,7 @@ const ariaLabel = computed(() =>
           role="button"
           tabindex="0"
           :data-position="slot.position"
-          :aria-label="`引脚 ${slot.position} ${pinsByPosition.get(slot.position)?.name ?? ''}`"
+          :aria-label="`引脚 ${slot.position} ${slotLabel(slot)}`"
           @click="store.selectPin(slot.position)"
           @keydown.enter.prevent="store.selectPin(slot.position)"
           @keydown.space.prevent="store.selectPin(slot.position)"
@@ -258,6 +264,7 @@ const ariaLabel = computed(() =>
 
           <template v-if="slot.side">
             <text
+              v-if="policy.showNumber"
               :x="labelStyle(slot).number.x"
               :y="labelStyle(slot).number.y"
               :text-anchor="labelStyle(slot).number.anchor"
@@ -291,10 +298,16 @@ const ariaLabel = computed(() =>
         :style="{ left: `${hover.x + 12}px`, top: `${hover.y + 12}px` }"
       >
         <p class="font-medium">
-          {{ hoveredPin.position }} · {{ hoveredPin.name }}
+          {{ hoveredPin.position }} · {{ pinPrimary(hoveredPin) }}
         </p>
         <p class="text-muted-foreground">
-          {{ PIN_TYPE_LABEL[hoveredPin.type] }} · {{ hoveredPin.pad }}
+          {{ PIN_TYPE_LABEL[hoveredPin.type] }}
+          <template v-if="pinAliases(hoveredPin).length">
+            · 别名 {{ pinAliases(hoveredPin).join(' / ') }}
+          </template>
+          <template v-if="hoveredPin.variantOf">
+            · 重映射 {{ hoveredPin.variantOf }}
+          </template>
         </p>
         <ul v-if="hoveredPin.functions.length" class="mt-1 space-y-0.5">
           <li v-for="fn in hoveredPin.functions.slice(0, 3)" :key="`${fn.peripheral}_${fn.signal}`">

@@ -13,7 +13,7 @@ function linearPins(n: number): Pin[] {
     position: String(i + 1),
     pad: `P${i + 1}`,
     name: `P${i + 1}`,
-    type: 'io' as const,
+    type: 'gpio' as const,
     functions: [],
   }))
 }
@@ -32,7 +32,7 @@ function gridPins(rows: number, cols: number): Pin[] {
   for (let r = 0; r < rows; r++) {
     for (let c = 1; c <= cols; c++) {
       const position = `${rowLabelAt(r)}${c}`
-      out.push({ position, pad: position, name: position, type: 'io', functions: [] })
+      out.push({ position, pad: position, name: position, type: 'gpio', functions: [] })
     }
   }
   return out
@@ -94,6 +94,14 @@ describe('字号跟着行距/格子走（不写死像素）', () => {
 
   it('组件层要求不看 pad 名时不画', () => {
     expect(policyFor('quad', linearPins(48), false).policy.showPadName).toBe(false)
+  })
+
+  it('density Mode：行距过小连引脚号也不画（LQFP208 每边 52 脚 → 行距 11.2）', () => {
+    expect(policyFor('quad', linearPins(100)).policy.showNumber).toBe(true)
+    const huge = policyFor('quad', linearPins(208))
+    expect(huge.policy.pitch).toBeCloseTo(11.15, 1)
+    expect(huge.policy.showNumber).toBe(false)
+    expect(huge.policy.showPadName).toBe(false)
   })
 
   it('pad 名可用宽度是本体内侧一半（左右两侧不会在中线相遇）', () => {

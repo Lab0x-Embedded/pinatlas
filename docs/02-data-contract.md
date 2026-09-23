@@ -59,20 +59,30 @@ HTTPS_PROXY=http://127.0.0.1:7899 pnpm data:pull   # 需要代理的环境
 
 ### pin 对象
 
+数据契约版本：**v1.1.0**（数据仓库 `docs/unified-schema.md`）。
+
 ```jsonc
 {
-  "position": "22",           // 线性引脚号，或网格坐标 "A1"
-  "pad": "PA11",              // 去重映射注解的焊盘名
-  "name": "PA11 [PA9]",       // 原始名（可能带重映射注解）
-  "type": "io",               // io | power | ground | reset | boot | mono | nc | other
-  "osc": true,                // 可选：晶振相关
-  "functions": [ { "peripheral": "TIM1", "signal": "CH4", "af": 2 } ],
-  "variants": { "PINREMAP": { "name": "PA9 [PA11]", "type": "io", "functions": [...] } }
+  "position": "22",           // 物理位置：线性引脚号，或网格坐标 "A1"；同文件内唯一
+  "primary": "PA11",          // 主显示名：图上只渲染这个
+  "aliases": ["VDDA"],        // 从名字拆出来的别名（可省略）
+  "variantOf": "PA9",         // 可选：重映射标注指向的 pad（"PA11 [PA9]"）
+  "pad": "PA11",              // 焊盘名（= primary）
+  "name": "PA11 [PA9]",       // 上游原始名，保留可追溯
+  "type": "gpio",             // gpio | power | ground | reset | boot | clock | mono | nc | other
+  "osc": true,                // 可选：晶振相关（这类脚 type 直接是 clock）
+  "functions": [ { "peripheral": "TIM1", "signal": "CH4", "af": 2, "type": "timer" } ],
+  "variants": { "PINREMAP": { "name": "PA9 [PA11]", "primary": "PA9", "type": "gpio", "functions": [...] } }
 }
 ```
 
+**为什么拆 `primary` / `aliases` / `variantOf`**：上游把"主名 + 额外功能提示 + 第二个网络名 + 重映射标注"全塞在 `name` 里，直接渲染会出现「一个物理脚两个名字」并且分不清哪个是主名（`PC13-TAMPER-RTC`、`VDD/VDDA`、`PA11 [PA9]`）。拆分规则见数据仓库 `docs/unified-schema.md` 的对照表。
+
+**兼容**：前端对 v1.0.0 数据（没有 `primary`）有兜底——`pinPrimary()` / `pinAliases()` 会按同一套规则现场拆分，所以新旧数据都能正确显示主名。
+
 ## 3. 前端必须遵守的三条
 
+0. **图上只画 `primary`**，别直接画 `name`（否则会把别名当成主名，出现 `VDD/VDDA` 这种合成标签）；别名、重映射标注放 hover 和 Inspector。
 1. **引脚数看 `pinCount`，不要看数组长度**（上游 14% 的线性封装文件存在重复 `position`，数据层已合并）。
 2. **`af` 可能为 `null`**：表示"上游没有 AF 数据"，**不是 0**。整片 STM32F1 都是 `null`，UI 要显示成"—"而不是 `AF0`，并在型号页给一句说明。
 3. **`functions[].system: true`** 的条目（`RCC_*`、`SYS_*`）不是可配置外设，详情面板单独分组（"系统/时钟"），不要和外设混排。

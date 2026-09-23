@@ -31,7 +31,8 @@ app/
     useTheme.ts               亮/暗主题（class 策略）
   utils/
     package-layout.ts         核心：packageKind → 引脚坐标（见 05）
-    label-policy.ts           字号策略（随行距/格子反推）+ fitText 截断
+    label-policy.ts           字号策略（随行距/格子反推 + Density Mode 阈值）+ fitText 截断
+    pin-types.ts              类型映射/图例色/主名拆分兜底（pinPrimary、pinAliases、splitPinName）
     pin-types.ts              type → 颜色/中文名/图标
     functions.ts              功能分组、AF 格式化、系统外设过滤
   stores/

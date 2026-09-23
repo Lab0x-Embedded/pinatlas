@@ -61,6 +61,7 @@ export const FUNCTION_TYPE_LABEL: Record<string, string> = {
  *   "VDD/VDDA"        → primary=VDD,  aliases=[VDDA]
  *   "VSSA/VREF-"      → primary=VSSA, aliases=[VREF-]（负参考的连字符属于名字）
  *   "PA13 (JTMS/SWDIO)" → primary=PA13, aliases=[JTMS, SWDIO]（括号注释，先摘再拆！）
+ *   "PC2_C"             → primary=PC2（_C 是模拟开关后缀，主名取焊盘 token）
  *   "PA11 [PA9]"      → primary=PA11, variantOf=PA9
  */
 export function splitPinName(name: string) {
@@ -84,22 +85,36 @@ export function splitPinName(name: string) {
     raw = raw.slice(0, paren).trim()
   }
 
-  // 3) 斜杠 = 第二个网络名；连字符 = 额外功能提示
-  const segments = raw.split('/').map(s => s.trim()).filter(Boolean)
-  const dashParts = (segments[0] || raw).split('-').map(s => s.trim())
-  const primary = (dashParts[0] || raw).toUpperCase()
-
   const aliases: string[] = []
-  for (const part of dashParts.slice(1)) {
-    if (part) {
-      aliases.push(part.toUpperCase())
+  // 3) 主名优先取"字母 + 数字"的焊盘 token（AF join 的键）：PC2_C → PC2
+  const token = /^([A-Za-z]+\d+)/.exec(raw)
+  let primary: string
+  if (token?.[1]) {
+    primary = token[1].toUpperCase()
+    // 下划线属于信号名（OSC_IN），只能按 / 和 - 拆；再剥掉首尾的 _ 与空白
+    for (const part of raw.slice(token[1].length).split(/[/-]/).map(s => s.trim().replace(/^[\s_]+|[\s_]+$/g, '').toUpperCase())) {
+      if (part.length > 1) {
+        aliases.push(part)
+      }
     }
   }
-  for (const part of segments.slice(1)) {
-    if (part) {
-      aliases.push(part.toUpperCase())
+  else {
+    // 4) 无焊盘 token（VDD/VDDA、VSSA/VREF-、PDR_ON）：按 / 再按 - 拆，第一段为主名
+    const segments = raw.split('/').map(s => s.trim()).filter(Boolean)
+    const dashParts = (segments[0] || raw).split('-').map(s => s.trim())
+    primary = (dashParts[0] || raw).toUpperCase()
+    for (const part of dashParts.slice(1)) {
+      if (part) {
+        aliases.push(part.toUpperCase())
+      }
+    }
+    for (const part of segments.slice(1)) {
+      if (part) {
+        aliases.push(part.toUpperCase())
+      }
     }
   }
+
   for (const part of parenAliases) {
     if (part) {
       aliases.push(part)

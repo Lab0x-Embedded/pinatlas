@@ -29,6 +29,11 @@ describe('splitPinName：把混在名字里的三类信息拆开', () => {
     expect(splitPinName('PC14-OSC32_IN (PC14)')).toEqual({ primary: 'PC14', aliases: ['OSC32_IN'], variantOf: null })
   })
 
+  it('字母+数字后缀（模拟开关脚）主名取焊盘 token：PC2_C → PC2', () => {
+    expect(splitPinName('PC2_C')).toEqual({ primary: 'PC2', aliases: [], variantOf: null })
+    expect(splitPinName('PB2_BOOT1')).toEqual({ primary: 'PB2', aliases: ['BOOT1'], variantOf: null })
+  })
+
   it('主名不带任何注释残留（AF join 键就是它）', () => {
     for (const name of ['PA13 (JTMS/SWDIO)', 'PC14-OSC32_IN (PC14)', 'PA11 [PA9]', 'VDD/VDDA', 'PA0-WKUP']) {
       expect(splitPinName(name).primary).toMatch(/^[A-Z][A-Z0-9_+]*$/)

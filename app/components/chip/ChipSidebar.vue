@@ -94,13 +94,16 @@ function chipSubtitle(entry: { package: string | null, pinCount: number | null, 
             <Button
               type="button"
               variant="ghost"
+              :title="entry.displayName"
               :class="cn(
                 'h-auto w-full flex-col items-stretch justify-start gap-0 rounded-md px-2 py-1.5 text-left whitespace-normal',
                 store.currentChipId === entry.chip ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
               )"
               @click="store.selectChip(entry.chip)"
             >
-              <span class="block truncate text-sm">{{ entry.displayName }}</span>
+              <!-- 主名用唯一型号 id：displayName 是数据手册式合并名（STM32C011F(4-6)Px），
+                   全库 24% 的条目会因为封装/脚数/Flash 都相同而显示得一模一样（见 docs/04 §3） -->
+              <span class="block truncate text-sm">{{ entry.chip }}</span>
               <span class="text-muted-foreground block truncate text-[11px]">{{ chipSubtitle(entry) }}</span>
             </Button>
           </li>
@@ -144,13 +147,14 @@ function chipSubtitle(entry: { package: string | null, pinCount: number | null, 
                   <Button
                     type="button"
                     variant="ghost"
+                    :title="entry.displayName"
                     :class="cn(
                       'h-auto w-full flex-col items-stretch justify-start gap-0 rounded-md px-2 py-1.5 text-left whitespace-normal',
                       store.currentChipId === entry.chip ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
                     )"
                     @click="store.selectChip(entry.chip)"
                   >
-                    <span class="block truncate text-sm">{{ entry.displayName }}</span>
+                    <span class="block truncate text-sm">{{ entry.chip }}</span>
                     <span class="text-muted-foreground block truncate text-[11px]">{{ chipSubtitle(entry) }}</span>
                   </Button>
                 </li>

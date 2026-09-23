@@ -43,8 +43,10 @@ export default defineNuxtConfig({
       title: appName,
       viewport: 'width=device-width,initial-scale=1',
       link: [
-        { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
-        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+        // 图标都在 public/（由原始 logo 生成：透明底 PNG + 多尺寸 ico，见 docs/04 §1 品牌资源）
+        { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
+        { rel: 'icon', href: '/logo.png', type: 'image/png', sizes: '512x512' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' },
       ],
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },

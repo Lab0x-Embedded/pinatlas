@@ -32,6 +32,22 @@ shadcn-vue 的令牌是 CSS 变量，落在 `app/assets/css/main.css`（亮/暗�
 
 引脚填充用 `令牌色/15%`，边框用令牌本色 —— 这样暗色下也不会刺眼。
 
+### 1.1 品牌资源（`public/`）
+
+图标统一从**一张原始 logo**（RGBA、透明底）生成，全部落在 `public/`：
+
+| 文件 | 尺寸 | 底 | 内容占比 | 用在哪 |
+|---|---|---|---|---|
+| `logo.png` | 512×512 | 透明 | 92% | `<link rel="icon">`、README、将来的页头 logo |
+| `favicon.ico` | 16/32/48/64 多尺寸 | 透明 | 满铺 | 浏览器标签页（`nuxt.config.ts` 的 head） |
+| `apple-touch-icon.png` | 180×180 | **白底**（iOS 不吃透明） | 84% | iOS 添加到主屏 |
+| `pwa-192x192.png` / `pwa-512x512.png` | 192 / 512 | 透明 | 92% | PWA manifest（`app/config/pwa.ts`） |
+| `maskable-icon.png` | 512×512 | **白底** | **60%**（落进 80% 安全区） | Android maskable 图标 |
+
+生成要点（可复现）：清掉 `alpha < 10` 的压缩残留再按 alpha 包围盒裁剪（否则 bbox 会撑大一圈），
+缩放用 LANCZOS；maskable 必须留安全区且不透明，否则系统裁圆时会切掉引脚。
+验证方式：把透明版叠到深色/浅色背景上肉眼核对没有白边与镂空，并确认 `.ico` 内含 16/32/48/64。
+
 ## 2. 组件清单（shadcn-vue）
 
 | 组件 | 用在哪 |

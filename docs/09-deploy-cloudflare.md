@@ -10,7 +10,7 @@
 | 构建命令 | `pnpm build` | 本机实测通过 |
 | 构建输出目录 | **`dist`** | `NITRO_PRESET=cloudflare_pages pnpm build` 实测产物在 `dist/`（不是 `.output/public`） |
 | 环境变量 | `NITRO_PRESET=cloudflare_pages` | 不设这个，`pnpm build` 产物是 Node 服务（`.output/server`），Pages 跑不起来 |
-| 环境变量 | `PNPM_VERSION=10.22.0` | 与 `package.json` 的 `packageManager` 一致，避免构建机用别的 pnpm 解析 `catalogs` |
+| 环境变量（可选） | `PNPM_VERSION=10.22.0` | 与 `package.json` 的 `packageManager` 一致；本仓库已不用 catalogs，不设也能装 |
 | 环境变量（可选） | `NUXT_PUBLIC_DATA_TAG=data-2026.09.23` | 固定数据版本，避免分支缓存漂移；不设则用 `main` |
 | 环境变量（可选） | `NUXT_PUBLIC_DATA_CDN_HOST=fastly.jsdelivr.net` | 默认已是 fastly |
 
@@ -49,10 +49,18 @@ catalogs:
 ```
 
 这种写法是 `pnpm lint --fix` 写坏的（`eslint-plugin-pnpm` 的 `yaml-*` 规则会"帮忙"改成 catalog 引用）。
-仓库里已经处理：`eslint.config.js` 对 `pnpm-workspace.yaml` 关掉了带 `--fix` 的 yaml 规则（见 docs/07 §11）。
 
-**历史**：坏值只存在于**初始提交 `9fd50a7`**，`4005b9a` 已修复（`git log -S "catalog:dev" -- pnpm-workspace.yaml` 可查）。
-所以**如果构建时报这个错，说明构建跑的是 9fd50a7 那个旧提交**，而不是当前 main：
+**现在已彻底消除**：本仓库是单包仓库，`catalogs` 只带来风险，因此**把 25 个 `catalog:*` 引用全部改成字面
+语义化版本，并删掉了 `catalogs` 段**（`overrides` 里的 `catalog:build` 同样展开）。当前 main 里：
+
+```bash
+curl -s https://raw.githubusercontent.com/Lab0x-Embedded/pinatlas/main/pnpm-workspace.yaml | grep -c catalogs
+# 期望 0
+```
+
+**如果构建仍报这个错**，那构建跑的一定是旧提交（坏值只存在于初始提交 `9fd50a7`，`4005b9a` 已修）。
+用 `git log -S "catalog:dev" -- pnpm-workspace.yaml` 可查该值出现在哪些提交：
+部署页面上核对 commit hash，然后：
 
 1. 在 Cloudflare 项目里确认 Production branch = `main`，且部署的是最新提交（Pages → Deployments 里看 commit hash）；
 2. 重新触发一次部署（Retry deployment / 空提交 push），或先清掉构建缓存（Settings → Build cache → Clear）；

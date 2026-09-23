@@ -14,6 +14,10 @@
 
 **预防**：`packageManager` 字段与实际运行的 pnpm 版本保持一致；不要在两个大版本间来回切。
 
+> 后续（部署事故）：这个 catalogs 用法在 Cloudflare 构建里又炸了一次（`ERR_PNPM_CATALOG_ENTRY_INVALID_RECURSIVE_DEFINITION`，
+> 见 docs/09 §3）。单包仓库不需要 catalogs，已把 25 个 `catalog:*` 引用全部展开成字面版本并删除 `catalogs` 段，
+> 从根上消除这一类失败。
+
 ### 2. 并行抓取上游 CDN 会静默丢文件
 
 **症状**：抓 49 个文件，其中 12 个（24%）拿不到数据，但 curl 单独复测全部 200。

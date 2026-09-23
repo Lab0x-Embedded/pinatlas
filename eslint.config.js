@@ -12,10 +12,10 @@ export default antfu(
 )
   .append(nuxt())
   .append({
-    // pnpm-workspace.yaml 的自动修复不可用：`pnpm lint --fix` 会把 catalogs 里的版本号
-    // 改写成 `catalog:<同名组>`，那是递归定义，pnpm 会直接拒绝（ERR_PNPM_CATALOG_ENTRY_INVALID_RECURSIVE_DEFINITION）。
-    // 已验证过一次（工作区文件被改坏 → pnpm install 直接失败），因此这里关掉这几个规则在
-    // pnpm-workspace.yaml 上的检查，只在 package.json 一侧保留 catalog 约定。
+    // pnpm-workspace.yaml 不再使用 catalogs（本仓库是单包仓库，catalogs 只带来风险：
+    // `pnpm lint --fix` 会把 catalog 的值改写成 `catalog:<同名组>` 这种递归定义，pnpm 直接拒绝；
+    // Cloudflare 构建也因此失败过一次）。版本现在直接写在 package.json / overrides 里。
+    // 下面这些规则继续关着，防止以后有人手滑再引入 catalogs。
     files: ['pnpm-workspace.yaml'],
     rules: {
       'pnpm/yaml-blank-lines': 'off',
@@ -25,10 +25,8 @@ export default antfu(
     },
   })
   .append({
-    // package.json 一侧也关掉 catalog 强制：
-    // `pnpm install` 在重新解析依赖时会把 `catalog:build` 写回字面版本（本仓库实测），
-    // 而 eslint 要求写 catalog → 两个工具互相打架。以 pnpm install 为准（装不上比风格问题严重），
-    // 版本仍集中在 pnpm-workspace.yaml 的 catalogs 里维护。
+    // package.json 一侧也关掉 catalog 强制：本仓库不使用 catalogs，
+    // 直接写语义化版本，避免 eslint 的 pnpm/json-enforce-catalog 把版本改回 `catalog:` 引用。
     files: ['package.json'],
     rules: {
       'pnpm/json-enforce-catalog': 'off',

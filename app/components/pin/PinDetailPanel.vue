@@ -23,17 +23,12 @@ function variantOf(position: string, key: string | null) {
 
 <template>
   <Card class="gap-3 py-3">
-    <CardHeader class="gap-1">
+    <CardHeader v-if="pin" class="gap-1">
       <CardTitle class="flex items-center gap-2 text-base">
-        <template v-if="pin">
-          <span class="tabnum">{{ pin.position }}</span>
-          <span class="truncate">{{ pinPrimary(pin) }}</span>
-        </template>
-        <template v-else>
-          {{ strings.selectPin }}
-        </template>
+        <span class="tabnum">{{ pin.position }}</span>
+        <span class="truncate">{{ pinPrimary(pin) }}</span>
       </CardTitle>
-      <CardDescription v-if="pin" class="space-y-1">
+      <CardDescription class="space-y-1">
         <span class="block">
           pin <span class="tabular-nums">{{ pin.position }}</span> · {{ PIN_TYPE_LABEL[pin.type] }}
         </span>
@@ -48,6 +43,20 @@ function variantOf(position: string, key: string | null) {
         </span>
       </CardDescription>
     </CardHeader>
+
+    <!-- 未选中引脚的空态：做成居中的图标 + 一行说明，比"卡片里孤零零一行字"体面得多 -->
+    <CardContent v-else class="flex flex-col items-center gap-2 px-6 py-10 text-center">
+      <svg class="text-muted-foreground/50 size-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <rect x="7" y="7" width="10" height="10" rx="2" />
+        <path d="M4 10h3M4 14h3M17 10h3M17 14h3M10 4v3M14 4v3M10 17v3M14 17v3" />
+      </svg>
+      <p class="text-sm font-medium">
+        {{ strings.selectPin }}
+      </p>
+      <p class="text-muted-foreground text-xs">
+        {{ strings.selectPinHint }}
+      </p>
+    </CardContent>
 
     <CardContent v-if="pin" class="space-y-3">
       <div class="flex flex-wrap gap-1">

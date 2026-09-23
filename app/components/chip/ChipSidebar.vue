@@ -215,8 +215,9 @@ function chipIdParts(match: ChipSearchMatch) {
           {{ strings.searchHint }}
         </p>
         <div v-for="group in visibleGroups" :key="group.line" class="mb-3">
-          <p class="text-muted-foreground px-2 py-1 text-[11px] font-medium">
+          <p class="text-foreground/75 border-border/60 mt-2 mb-0.5 truncate border-b px-2 pb-1 text-xs font-semibold tracking-wide" :title="group.line">
             {{ group.line }}
+            <span class="text-muted-foreground font-normal tabular-nums">· {{ group.matches.length }}</span>
           </p>
           <ul class="space-y-0.5">
             <li v-for="match in visibleMatches(group.matches, group.line)" :key="match.entry.chip">
@@ -294,8 +295,9 @@ function chipIdParts(match: ChipSearchMatch) {
         <div v-if="expanded.has(group.family)" class="mt-0.5 ml-3 border-l pl-2">
           <template v-if="group.loaded">
             <div v-for="lineGroup in store.groupedChips.filter(g => group.chips.some(c => c.line === g.line))" :key="lineGroup.line">
-              <p class="text-muted-foreground px-2 py-1 text-[11px] font-medium">
+              <p class="text-foreground/75 border-border/60 mt-2 mb-0.5 truncate border-b px-2 pb-1 text-xs font-semibold tracking-wide" :title="lineGroup.line">
                 {{ lineGroup.line }}
+                <span class="text-muted-foreground font-normal tabular-nums">· {{ lineGroup.chips.length }}</span>
               </p>
               <ul class="space-y-0.5">
                 <li v-for="entry in lineGroup.chips" :key="entry.chip">

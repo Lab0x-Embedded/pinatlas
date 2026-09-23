@@ -10,16 +10,18 @@ const DEFAULT_CHIP = 'STM32F103C8Tx'
 const syncing = ref(false)
 
 async function bootstrap() {
-  // 三个 query 参数必须在任何 await 之前取出来：下面的 selectChip() 会改 currentChipId，
-  // 触发 URL 同步 watcher 用 {chip} 覆写 query，把 pin / variant 冲掉。
-  // 线上实测（生产构建）就是这个竞态：?chip=…&pin=96 打完只剩 chip，右侧面板一直停在
-  // 「点击引脚查看复用功能」，而 dev 下时序不同看不出来。
-  const wantedChip = typeof route.query.chip === 'string' ? route.query.chip : null
-  const wantedPin = typeof route.query.pin === 'string' ? route.query.pin : null
-  const wantedVariant = typeof route.query.variant === 'string' ? route.query.variant : null
-
-  // 只拉清单（约 9 KB）+ 目标型号所在的系列；其余系列等用户展开或搜索时再拉。
+  // 参数必须在「loadManifest 之后、selectChip 之前」取好，两个坑都实测过：
+  //   ① 生产构建是预渲染页（nitro.prerender '/'）：onMounted 时 router 还没把地址栏的 query
+  //      同步进 route，此时同步读 route.query 恒为空，深链会静默退化成默认型号
+  //      （dev 不做预渲染，route.query 立刻可用，所以开发时看不出来）。
+  //   ② 取完再用，不能等到 selectChip 之后再读：selectChip 会改 currentChipId，触发 URL 同步
+  //      watcher 用 {chip} 覆写 query，把 pin / variant 冲掉（线上实测过）。
   await store.loadManifest()
+  const fromUrl = new URLSearchParams(import.meta.client ? window.location.search : '')
+  const wantedChip = queryParam('chip') || fromUrl.get('chip')
+  const wantedPin = queryParam('pin') || fromUrl.get('pin')
+  const wantedVariant = queryParam('variant') || fromUrl.get('variant')
+
   await store.selectChip(wantedChip || DEFAULT_CHIP)
   if (wantedPin) {
     store.selectPin(wantedPin)
@@ -27,6 +29,12 @@ async function bootstrap() {
   if (wantedVariant) {
     store.setVariant(wantedVariant)
   }
+}
+
+/** route.query 里的字符串参数（非字符串/缺失时返回空串） */
+function queryParam(key: string): string {
+  const value = route.query[key]
+  return typeof value === 'string' ? value : ''
 }
 
 onMounted(bootstrap)
@@ -95,9 +103,12 @@ useHead({ title: `${strings.appName} · ${strings.tagline}` })
         </AlertDescription>
       </Alert>
 
-      <div v-else-if="store.loadingChip" class="space-y-3">
+      <div v-else-if="store.loadingChip || store.resolving" class="space-y-3">
         <Skeleton class="mx-auto aspect-square w-full max-w-[720px] rounded-xl" />
         <Skeleton class="h-4 w-2/3" />
+        <p class="text-muted-foreground text-center text-xs">
+          {{ strings.loading }}
+        </p>
       </div>
 
       <div v-else-if="store.chip" class="border-border rounded-xl border p-4">

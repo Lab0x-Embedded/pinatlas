@@ -32,6 +32,12 @@ export const useChipsStore = defineStore('chips', () => {
   const chip = ref<ChipDoc | null>(null)
   const chipError = ref<string | null>(null)
   const loadingChip = ref(false)
+  /**
+   * 正在解析/拉取当前型号（含"等家族分片"那段）：光靠 loadingChip 不够，
+   * 分片还没回来时 loadingChip 仍是 false、chip 又是 null，页面会先闪一下空态
+   * （数据源切换、首屏、搜索结果点进新子系列时都能看到那段空白）。
+   */
+  const resolving = ref(false)
 
   const query = ref('')
   const currentChipId = ref<string | null>(null)
@@ -263,6 +269,7 @@ export const useChipsStore = defineStore('chips', () => {
     indexError.value = null
     chip.value = null
     chipError.value = null
+    resolving.value = false
   }
 
   async function ensureShard(family: string) {
@@ -331,6 +338,17 @@ export const useChipsStore = defineStore('chips', () => {
       return
     }
 
+    resolving.value = true
+    try {
+      await fetchChip(chipId)
+    }
+    finally {
+      resolving.value = false
+    }
+  }
+
+  /** 真正去取芯片文档（可能要先把所在家族的索引分片拉下来） */
+  async function fetchChip(chipId: string) {
     // 目标芯片可能在尚未加载的系列里：先把它的系列拉下来（同 die 的其它封装也在同一系列）
     let entry = loadedChips.value.find(e => e.chip === chipId)
     if (!entry) {
@@ -400,6 +418,7 @@ export const useChipsStore = defineStore('chips', () => {
     chip,
     chipError,
     loadingChip,
+    resolving,
     query,
     currentChipId,
     selectedPosition,

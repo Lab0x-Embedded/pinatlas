@@ -13,6 +13,7 @@ export const strings = {
   noResultHint: '数据集只覆盖已收录型号，可在 pinatlas-data 仓库查看收录范围。',
   selectChip: '从左侧选择一个型号',
   selectPin: '点击引脚查看复用功能',
+  selectPinHint: '在左侧引脚图上点任意一个引脚',
   loading: '加载中…',
   loadFailed: '数据加载失败',
   retry: '重试',

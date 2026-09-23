@@ -33,13 +33,17 @@ function onDataSourceChange(value: unknown) {
 </script>
 
 <template>
-  <header class="border-border bg-background/95 supports-backdrop-blur:bg-background/60 sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur">
+  <!-- 三列网格（1fr_搜索_1fr）：搜索框相对**页头**居中，而不是"在品牌与右侧操作区的
+       缝隙里 mx-auto"。右侧加了下拉以后变宽，用 mx-auto 会把搜索框顶偏一个下拉的宽度。
+       两侧用 minmax(min-content,1fr)：窄屏时让搜索框先缩，别让右侧按钮被它压住
+       （实测 560px 下 28rem 固定宽度会与主题/仓库按钮重叠 28px）。 -->
+  <header class="border-border bg-background/95 supports-backdrop-blur:bg-background/60 sticky top-0 z-30 grid h-14 shrink-0 grid-cols-[minmax(min-content,1fr)_minmax(0,28rem)_minmax(min-content,1fr)] items-center gap-3 border-b px-4 backdrop-blur">
     <div class="flex items-center gap-2">
       <img src="/logo-64.png" alt="" width="28" height="28" class="size-7 shrink-0 rounded-md">
       <span class="text-sm font-semibold tracking-tight">{{ appName }}</span>
     </div>
 
-    <div class="relative mx-auto w-full max-w-md">
+    <div class="relative w-full justify-self-center">
       <svg class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <circle cx="11" cy="11" r="7" />
         <path d="m20 20-3.5-3.5" />
@@ -57,7 +61,7 @@ function onDataSourceChange(value: unknown) {
       </kbd>
     </div>
 
-    <div class="ml-auto flex items-center gap-1">
+    <div class="flex items-center justify-end gap-1 justify-self-end">
       <span class="text-muted-foreground hidden text-xs lg:inline">{{ formatter.format(store.totalChips) }} 个型号</span>
       <!-- 数据源（CDN 镜像）切换：不同运营商/地区哪个镜像快差别很大，用户自己切比我们赌一个准 -->
       <Select :model-value="store.dataSource" @update:model-value="onDataSourceChange">
@@ -71,8 +75,7 @@ function onDataSourceChange(value: unknown) {
             :value="source.value"
             :hint="source.hint"
           >
-            <span class="flex-1 truncate">{{ source.label }}</span>
-            <span class="text-muted-foreground text-[10px]">{{ source.value }}</span>
+            {{ source.label }}
           </SelectItem>
         </SelectContent>
       </Select>

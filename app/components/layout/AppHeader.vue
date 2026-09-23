@@ -36,7 +36,7 @@ const dataHost = computed(() => {
 <template>
   <header class="border-border bg-background/95 supports-backdrop-blur:bg-background/60 sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur">
     <div class="flex items-center gap-2">
-      <span class="bg-primary text-primary-foreground grid size-7 place-items-center rounded-md text-xs font-bold">P</span>
+      <img src="/logo-64.png" alt="" width="28" height="28" class="size-7 shrink-0 rounded-md">
       <span class="text-sm font-semibold tracking-tight">{{ appName }}</span>
     </div>
 

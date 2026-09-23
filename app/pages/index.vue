@@ -10,17 +10,22 @@ const DEFAULT_CHIP = 'STM32F103C8Tx'
 const syncing = ref(false)
 
 async function bootstrap() {
+  // 三个 query 参数必须在任何 await 之前取出来：下面的 selectChip() 会改 currentChipId，
+  // 触发 URL 同步 watcher 用 {chip} 覆写 query，把 pin / variant 冲掉。
+  // 线上实测（生产构建）就是这个竞态：?chip=…&pin=96 打完只剩 chip，右侧面板一直停在
+  // 「点击引脚查看复用功能」，而 dev 下时序不同看不出来。
+  const wantedChip = typeof route.query.chip === 'string' ? route.query.chip : null
+  const wantedPin = typeof route.query.pin === 'string' ? route.query.pin : null
+  const wantedVariant = typeof route.query.variant === 'string' ? route.query.variant : null
+
   // 只拉清单（约 9 KB）+ 目标型号所在的系列；其余系列等用户展开或搜索时再拉。
   await store.loadManifest()
-
-  const wanted = typeof route.query.chip === 'string' ? route.query.chip : null
-  const target = wanted || DEFAULT_CHIP
-  await store.selectChip(target)
-  if (typeof route.query.pin === 'string') {
-    store.selectPin(route.query.pin)
+  await store.selectChip(wantedChip || DEFAULT_CHIP)
+  if (wantedPin) {
+    store.selectPin(wantedPin)
   }
-  if (typeof route.query.variant === 'string') {
-    store.setVariant(route.query.variant)
+  if (wantedVariant) {
+    store.setVariant(wantedVariant)
   }
 }
 

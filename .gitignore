@@ -7,3 +7,6 @@ dist
 .env
 .idea/
 public/assets/fonts
+
+# 数据集快照（用 pnpm data:pull 生成，见 docs/02-data-contract.md）
+public/data

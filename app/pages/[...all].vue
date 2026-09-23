@@ -1,17 +1,21 @@
 <script setup lang="ts">
-const router = useRouter()
+import { strings } from '~/constants/strings'
+
+useHead({ title: `404 · ${strings.appName}` })
 </script>
 
 <template>
-  <main p="x4 y10" text="center teal-700 dark:gray-200">
-    <div text-4xl>
-      <div i-carbon-warning inline-block />
-    </div>
-    <div>Not found</div>
-    <div>
-      <button text-sm btn m="3 t8" @click="router.back()">
-        Back
-      </button>
-    </div>
+  <main class="mx-auto flex max-w-2xl flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+    <p class="text-muted-foreground text-sm">
+      404
+    </p>
+    <h1 class="text-lg font-semibold">
+      页面不存在
+    </h1>
+    <Button as-child variant="outline">
+      <NuxtLink to="/">
+        回到查询台
+      </NuxtLink>
+    </Button>
   </main>
 </template>

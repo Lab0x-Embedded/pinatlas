@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.22.0+sha512.bf049efe995b28f527fd2b41ae0474ce29186f7edcb3bf545087bd61fbbebb2bf75362d1307fda09c2d288e1e499787ac12d4fcb617a974718a6051f2eee741c",
   "scripts": {
     "build": "nuxt build",
+    "data:pull": "node scripts/pull-data.mjs",
     "dev:pwa": "VITE_PLUGIN_PWA=true nuxt dev",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
@@ -12,7 +13,9 @@
     "start": "node .output/server/index.mjs",
     "start:generate": "npx serve .output/public",
     "lint": "eslint .",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:dev",
@@ -22,20 +25,24 @@
     "@nuxt/eslint": "catalog:build",
     "@nuxtjs/color-mode": "catalog:build",
     "@pinia/nuxt": "catalog:build",
+    "@tailwindcss/vite": "catalog:build",
     "@types/node": "catalog:dev",
-    "@unocss/eslint-config": "catalog:build",
-    "@unocss/nuxt": "catalog:build",
     "@vite-pwa/nuxt": "catalog:build",
     "@vueuse/core": "catalog:frontend",
     "@vueuse/nuxt": "catalog:build",
+    "class-variance-authority": "catalog:frontend",
+    "clsx": "catalog:frontend",
     "eslint": "catalog:dev",
     "eslint-plugin-format": "catalog:dev",
     "eslint-plugin-slop": "catalog:dev",
     "eslint-plugin-sonarjs": "catalog:dev",
     "nuxt": "^4.5.2",
     "pinia": "catalog:frontend",
+    "reka-ui": "catalog:frontend",
+    "tailwind-merge": "catalog:frontend",
+    "tailwindcss": "catalog:build",
     "typescript": "catalog:dev",
-    "unocss": "catalog:build",
+    "vitest": "catalog:dev",
     "vue": "catalog:frontend",
     "vue-tsc": "catalog:dev"
   }

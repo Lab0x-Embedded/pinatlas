@@ -1,6 +1,6 @@
 import type { Pin } from '~/types/pinatlas'
 import { describe, expect, it } from 'vitest'
-import { groupFunctions, normalizePins, normalizePinType, PIN_TYPE_FILL, PIN_TYPE_LABEL, PIN_TYPE_ORDER, PIN_TYPE_TEXT, pinAliases, pinPrimary, splitPinName } from '~/utils/pin-types'
+import { FUNCTION_TYPE_LABEL, groupFunctions, normalizePins, normalizePinType, PIN_TYPE_FILL, PIN_TYPE_LABEL, PIN_TYPE_ORDER, PIN_TYPE_TEXT, pinAliases, pinPrimary, splitPinName } from '~/utils/pin-types'
 
 /**
  * 主名/别名拆分：前端与数据层（pinatlas-data scripts/lib/normalize.mjs 的 splitPinName）同规则。
@@ -79,6 +79,28 @@ describe('功能分组与类型', () => {
     expect(groups.map(g => g.peripheral)).toEqual(['TIM2', 'RCC'])
     expect(groups[0].functions).toHaveLength(2)
     expect(groups[1].system).toBe(true)
+  })
+
+  /**
+   * schema 1.2.0：上游 `DAC_EXTI9`（PB9，F407）这类合成 token 已归成 EXTI/EXTI9。
+   * 旧数据（1.1.0）或缓存里的旧 JSON 仍可能带着 `DAC` + `EXTI9` 的假分组，分组只是
+   * 按 peripheral 名字走，不会崩；这里钉住的是新数据的排序与标记。
+   */
+  it('外部中断单独一档：排在可配置外设之后、系统信号之前', () => {
+    const groups = groupFunctions([
+      { peripheral: 'SYS', signal: 'WKUP', af: null, type: 'system', system: true },
+      { peripheral: 'EXTI', signal: 'EXTI9', af: null, type: 'exti', system: true },
+      { peripheral: 'TIM4', signal: 'CH4', af: 2, type: 'timer' },
+      { peripheral: 'CAN1', signal: 'TX', af: 9, type: 'can' },
+    ])
+    expect(groups.map(g => g.peripheral)).toEqual(['CAN1', 'TIM4', 'EXTI', 'SYS'])
+    expect(groups[2].exti).toBe(true)
+    expect(groups[2].system).toBe(true)
+    expect(groups[1].exti).toBe(false)
+  })
+
+  it('功能大类标签里 EXTI 是「外部中断」（面板徽标用它，不能是 undefined）', () => {
+    expect(FUNCTION_TYPE_LABEL.exti).toBe('外部中断')
   })
 })
 

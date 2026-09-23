@@ -91,6 +91,7 @@ export const FUNCTION_TYPE_LABEL: Record<string, string> = {
   uart: '串口',
   can: 'CAN',
   usb: 'USB',
+  exti: '外部中断',
   system: '系统',
   other: '其他',
 }
@@ -190,21 +191,32 @@ export function pinAliases(pin: Pick<Pin, 'aliases' | 'name'>): string[] {
 export interface FunctionGroup {
   peripheral: string
   system: boolean
+  /** EXTI 线组（type === 'exti'）：不是外设、也不算系统时钟，前端单独成「外部中断」块 */
+  exti: boolean
   functions: PinFunction[]
 }
 
-/** 按外设分组；RCC_/SYS_ 这类系统信号单独一组（docs/02-data-contract.md §3.3） */
+/**
+ * 按外设分组；RCC_/SYS_ 这类系统信号单独一组（docs/02-data-contract.md §3.3）。
+ *
+ * 排序分三档：① 可配置外设 ② EXTI 外部中断线 ③ RCC/SYS 系统信号（时钟、复位、
+ * 待机唤醒）。EXTI 单列是因为它既没有一套可配置的外设寄存器，也不属于系统时钟信号：
+ * 数据层把 `DAC_EXTI9` 这类上游合成 token 归一成 `EXTI/EXTI9` 后（schema 1.2.0），
+ * 前端必须在同一处收口，否则又会被拆进别的组。
+ */
 export function groupFunctions(functions: PinFunction[]): FunctionGroup[] {
   const groups = new Map<string, FunctionGroup>()
   for (const fn of functions) {
     const key = fn.peripheral || '其他'
-    const group = groups.get(key) ?? { peripheral: key, system: Boolean(fn.system), functions: [] }
+    const group = groups.get(key) ?? { peripheral: key, system: Boolean(fn.system), exti: false, functions: [] }
+    group.exti = group.exti || fn.type === 'exti'
     group.functions.push(fn)
     groups.set(key, group)
   }
+  const rank = (g: FunctionGroup) => (g.exti ? 1 : g.system ? 2 : 0)
   return [...groups.values()].sort((a, b) => {
-    if (a.system !== b.system) {
-      return a.system ? 1 : -1
+    if (rank(a) !== rank(b)) {
+      return rank(a) - rank(b)
     }
     return a.peripheral.localeCompare(b.peripheral, undefined, { numeric: true })
   })

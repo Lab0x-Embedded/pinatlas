@@ -94,13 +94,19 @@ function variantOf(position: string, key: string | null) {
           <div v-for="group in groups" :key="group.peripheral" class="space-y-1">
             <div class="flex items-center gap-2">
               <span class="text-xs font-medium">{{ group.peripheral }}</span>
-              <Badge v-if="group.system" variant="outline" class="text-[10px]">
+              <Badge v-if="group.exti" variant="outline" class="text-[10px]">
+                {{ FUNCTION_TYPE_LABEL.exti }}
+              </Badge>
+              <Badge v-else-if="group.system" variant="outline" class="text-[10px]">
                 {{ strings.systemGroup }}
               </Badge>
               <span v-else-if="FUNCTION_TYPE_LABEL[functionTypeOf(group)]" class="text-muted-foreground text-[10px]">
                 {{ FUNCTION_TYPE_LABEL[functionTypeOf(group)] }}
               </span>
             </div>
+            <p v-if="group.exti" class="text-muted-foreground text-[11px]">
+              {{ strings.extiHint }}
+            </p>
             <ul class="space-y-0.5">
               <li
                 v-for="fn in group.functions"
@@ -110,7 +116,7 @@ function variantOf(position: string, key: string | null) {
                 <span class="truncate">{{ functionLabel(fn) }}</span>
                 <span
                   class="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums"
-                  :title="fn.af === null ? strings.afUnknown : `AF${fn.af}`"
+                  :title="fn.type === 'exti' ? strings.afExtiNone : fn.af === null ? strings.afUnknown : `AF${fn.af}`"
                 >{{ afLabel(fn) }}</span>
               </li>
             </ul>

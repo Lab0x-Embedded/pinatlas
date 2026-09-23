@@ -12,7 +12,7 @@ import { appDescription, appName } from './app/constants/index'
 // 数据版本固定成**不可变 tag**，不用 main：jsDelivr 对分支引用有缓存，同一 URL 会拿到新旧两份
 // 数据（docs/07 §9），曾导致线上 37 个 GPIO 脚渲染成黑块（docs/07 §17）。
 // 数据仓库每次同步后打 `data-YYYY.MM.DD`，要跟新数据就更新这里的 tag，或用 NUXT_PUBLIC_DATA_TAG 覆盖。
-const dataTag = process.env.NUXT_PUBLIC_DATA_TAG || 'data-2026.09.23'
+const dataTag = process.env.NUXT_PUBLIC_DATA_TAG || 'data-2026.09.23.2'
 const dataHost = process.env.NUXT_PUBLIC_DATA_CDN_HOST || 'fastly.jsdelivr.net'
 const dataBase = process.env.NUXT_PUBLIC_DATA_BASE
   || (process.env.NUXT_PUBLIC_DATA_LOCAL === 'true'

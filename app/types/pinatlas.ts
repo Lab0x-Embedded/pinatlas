@@ -3,7 +3,7 @@
 export type PinType = 'gpio' | 'power' | 'ground' | 'reset' | 'boot' | 'clock' | 'mono' | 'nc' | 'other'
 export type PackageKind = 'quad' | 'dual' | 'grid' | 'unknown'
 /** 功能大类（分组用；原始 peripheral 名始终保留） */
-export type FunctionType = 'adc' | 'timer' | 'spi' | 'i2c' | 'uart' | 'can' | 'usb' | 'system' | 'other'
+export type FunctionType = 'adc' | 'timer' | 'spi' | 'i2c' | 'uart' | 'can' | 'usb' | 'exti' | 'system' | 'other'
 
 export interface PinFunction {
   peripheral: string

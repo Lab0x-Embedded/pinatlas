@@ -34,7 +34,10 @@ if (PROXY) {
 }
 
 async function download(source) {
-  const args = ['-sSL', '--max-time', '600', '-o', archive]
+  // -f：HTTP 4xx/5xx 要当失败退出，否则 codeload 的 404 页面会被当成 tar 包解出
+  // "Unrecognized archive format"，而 `refs/heads/<tag>` 这条路径对 tag 必然 404 →
+  // catch 里的 sha/tag 重试永远走不到（实测 data:pull 拉 tag 直接失败）。
+  const args = ['-sSLf', '--max-time', '600', '-o', archive]
   if (PROXY) {
     args.push('-x', PROXY)
   }
@@ -46,8 +49,8 @@ try {
   await download(url)
 }
 catch {
-  // sha 形式的 ref 走另一个路径
-  console.log(`  ${REF} 不是分支/tag，按 commit 重试`)
+  // tag / sha 形式的 ref 走另一个路径（codeload 的 tar.gz/<ref> 接受 tag 与 commit）
+  console.log(`  ${REF} 不是分支名，按 tag / commit 重试`)
   await download(urlForSha)
 }
 

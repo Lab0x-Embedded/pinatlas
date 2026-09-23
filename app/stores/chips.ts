@@ -1,5 +1,6 @@
 import type { ChipDoc, ChipIndexEntry, DatasetManifest, FamilyShard, Pin } from '~/types/pinatlas'
 import { fetchJson } from '~/utils/http'
+import { normalizePins } from '~/utils/pin-types'
 
 /**
  * 数据集与当前选中状态。
@@ -251,8 +252,11 @@ export const useChipsStore = defineStore('chips', () => {
     chip.value = null
     try {
       const doc = await fetchJson<ChipDoc>(`${dataBase.value}/${entry.part}`)
-      chipCache.set(chipId, doc)
-      chip.value = doc
+      // 数据入口归一化一次：type 的历史别名（io → gpio）与未知值都在这里收口，
+      // 下游（配色表 / 图例计数 / 标签）不必再防，见 docs/07 §17
+      const normalized: ChipDoc = { ...doc, pins: normalizePins(doc.pins) }
+      chipCache.set(chipId, normalized)
+      chip.value = normalized
     }
     catch (error) {
       chipError.value = (error as Error).message

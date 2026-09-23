@@ -15,11 +15,18 @@
 
 | 场景 | dataBase | 怎么来 |
 |---|---|---|
-| 默认（开发 + 部署） | `https://fastly.jsdelivr.net/gh/Lab0x-Embedded/pinatlas-data@main/data` | jsDelivr 的 **fastly** 镜像（国内直连实测最快） |
+| 默认（开发 + 部署） | `https://fastly.jsdelivr.net/gh/Lab0x-Embedded/pinatlas-data@data-2026.09.23/data` | jsDelivr 的 **fastly** 镜像（国内直连实测最快）+ **不可变 tag** |
 | 换镜像 | `https://<host>/gh/…` | `NUXT_PUBLIC_DATA_CDN_HOST=cdn|fastly|gcore|testingcf.jsdelivr.net` |
-| 固定版本（生产推荐） | 同上但用 tag | `NUXT_PUBLIC_DATA_TAG=data-2026.09.23` |
+| 固定/切换版本 | 同上但换 tag 或 sha | `NUXT_PUBLIC_DATA_TAG=data-2026.09.23`（默认值就写在这里） |
 | 完全离线 / 自托管 | `/data`（**同源**） | `pnpm data:pull` 解快照到 `public/data/`，再 `NUXT_PUBLIC_DATA_LOCAL=true` |
 | 任意基址 | 自定义 | `NUXT_PUBLIC_DATA_BASE=<完整 URL>` |
+
+**默认 tag 为什么不是 `main`**：jsDelivr 对分支引用有缓存，同一个 `@main` URL 在不同时间/边缘会返回
+新旧两份数据（docs/07 §9），两份数据的 `type` 枚举不同（v1.0.0 是 `io`、v1.1.0 是 `gpio`），
+前端一旦只认一个枚举，另一份就会整批查表失败 → 引脚渲染成黑块（docs/07 §17）。
+所以生产固定不可变 tag；数据仓库每次同步后打 `data-YYYY.MM.DD`，要跟新数据就改默认值或设环境变量。
+另外前端在数据入口做了归一化（`normalizePinType()`，`io → gpio`、未知类型 → `other`），
+即使旧缓存被命中也不会再变黑。
 
 **为什么镜像可选**：本机实测直连 `fastly` 1.4s、`cdn` 2.5s、`gcore` 3.9s、`testingcf` 1.3s（都通，主站偶发抖动）。
 浏览器经系统代理时**不要**把 `http://127.0.0.1:<port>` 当数据源（实测会被拦成 `Failed to fetch`），需要离线就用同源 `/data`。

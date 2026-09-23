@@ -167,6 +167,28 @@
 
 **教训**：这类"字段拆错 → 下游 join 少匹配"的 bug 不会抛错，只会让指标悄悄变差。所以①任何派生字段都要有断言锁住真实形态；②跨版本的指标对比（这次是 meta.json 的家族级覆盖率）是发现它的主要手段。
 
+### 17. 线上 37 个引脚渲染成黑块（旧枚举 `io` + jsDelivr 分支缓存）
+
+**症状**：Vercel 生产站上 STM32F103C8Tx（LQFP48）的引脚图里，PC13/PA0/PB… 共 37 个脚是**纯黑实心块**（无边框、无填充色），电源/地/复位/启动 11 个脚正常；图例显示 `GPIO / 复用 0`、`时钟 0`。同一个 commit 在本机 dev 上却是正常的浅蓝。
+
+**定位过程**（用 headless Chrome 抓生产页 DOM，不靠肉眼）：
+1. `--dump-dom` 抓线上页面，逐个 `<g data-position>` 取内部 `rect/circle` 的 `class`：
+   **37 个的 class 是空字符串**，彩色的 11 个都是 `fill-pin-*/15 stroke-pin-*` → 定位到 `PIN_TYPE_FILL[pin.type]` 查表失败。
+2. 图例计数印证：`GPIO 0 / 时钟 0`，而这两类正好是那 37 个脚。
+3. 对比数据版本：线上页面拉的 `pinatlas-data@main` 是 **`schemaVersion 1.0.0`**（`type` = `io 37 / power 5 / ground 4 / reset 1 / boot 1`），而数据仓库 main 上（raw 直取）是 **`1.1.0`**（`gpio 33 / clock 4 / …`）。枚举 `io→gpio` 是同一天 `e2a3fd0` 改的。
+
+**根因（两层）**：
+- **数据层**：jsDelivr 对**分支引用**（`@main`）有缓存，同一 URL 不同时间/边缘会返回新旧两份数据（§9）。这次线上命中的是改枚举之前的旧份。
+- **前端**：只认 `gpio`，遇到 `io` 时 `PIN_TYPE_FILL['io']` 是 `undefined` → `cn(undefined)` → class 为空 → SVG 用默认 `fill:black`。**未知类型静默降级成"不填色"，不报错也不兜底**，所以只有"变黑"这一个线索。
+
+**解法**：
+1. **数据入口归一化**（`app/utils/pin-types.ts` 的 `normalizePinType()`）：历史别名 `io → gpio`，其余未知/缺失值一律兜底 `other`（一定有配色）。在 store 载入芯片文档时对 `pins`（含 `variants`）归一一次，下游（配色/图例/标签）不必再各自防。
+2. **生产不再用分支引用**：数据仓库打不可变 tag（`data-2026.09.23`），`nuxt.config.ts` 默认 `dataTag` 指向它（`NUXT_PUBLIC_DATA_TAG` 可覆盖）。要跟新数据就换 tag，从根上避免新旧混装。
+
+**防回归**：`test/pin-types.spec.ts` 增加不变式断言 —— 归一化结果必须落在 `PIN_TYPE_FILL` / `PIN_TYPE_LABEL` 里（`io`、未知值、`toString` 这类原型键都测）；`PIN_TYPE_ORDER` 每个类型都必须有配色与标签。
+
+**教训**：①跨仓库的枚举重命名是**破坏性变更**，消费方要么兼容旧值、要么版本必须钉死，两者至少做一个；②"查表失败 → class 为空"这种降级路径在视觉上是**静默**的（不像报错会有人看见），所以配色表/图标表这类映射都要有"值必须存在"的断言；③验证线上问题要抓真实 DOM 数据（class/计数），不要只看截图里"看起来是黑的"。
+
 ## 三、待验证（已知风险，未闭环）
 
 | 项 | 现状 | 计划 |

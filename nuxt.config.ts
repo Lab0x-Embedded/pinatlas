@@ -8,8 +8,11 @@ import { appDescription, appName } from './app/constants/index'
 // 默认走 jsDelivr 的 **fastly** 镜像（国内直连实测最快：1.4s，主站 cdn.jsdelivr.net 2.5s，
 // gcore 3.9s）。可选镜像：fastly / cdn / gcore / testingcf，用 NUXT_PUBLIC_DATA_CDN_HOST 切换。
 // 想完全离线/自托管：`pnpm data:pull` 把快照放进 public/data/，再设 NUXT_PUBLIC_DATA_LOCAL=true。
-// 生产部署建议把 NUXT_PUBLIC_DATA_TAG 固定成数据仓库的 tag，避免分支缓存漂移。
-const dataTag = process.env.NUXT_PUBLIC_DATA_TAG || 'main'
+//
+// 数据版本固定成**不可变 tag**，不用 main：jsDelivr 对分支引用有缓存，同一 URL 会拿到新旧两份
+// 数据（docs/07 §9），曾导致线上 37 个 GPIO 脚渲染成黑块（docs/07 §17）。
+// 数据仓库每次同步后打 `data-YYYY.MM.DD`，要跟新数据就更新这里的 tag，或用 NUXT_PUBLIC_DATA_TAG 覆盖。
+const dataTag = process.env.NUXT_PUBLIC_DATA_TAG || 'data-2026.09.23'
 const dataHost = process.env.NUXT_PUBLIC_DATA_CDN_HOST || 'fastly.jsdelivr.net'
 const dataBase = process.env.NUXT_PUBLIC_DATA_BASE
   || (process.env.NUXT_PUBLIC_DATA_LOCAL === 'true'

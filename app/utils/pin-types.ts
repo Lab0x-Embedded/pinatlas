@@ -42,6 +42,46 @@ export const PIN_TYPE_TEXT: Record<PinType, string> = {
 /** 图例顺序：功能脚在前，电源/复位类在后（与数据手册的阅读习惯一致） */
 export const PIN_TYPE_ORDER: PinType[] = ['gpio', 'clock', 'mono', 'power', 'ground', 'reset', 'boot', 'nc', 'other']
 
+/**
+ * 历史别名 → 契约类型。
+ * 数据仓库 v1.0.0 把 GPIO 写成 `io`（v1.1.0 起统一为 `gpio`），而 jsDelivr 对分支引用
+ * 有缓存（docs/07 §9），线上可能同时拿到新旧两份数据 → 只认 `gpio` 会让整批 IO 脚
+ * 查表失败、class 为空、SVG 用默认填充渲染成**纯黑块**（docs/07 §17）。
+ */
+const PIN_TYPE_ALIASES: Record<string, PinType> = { io: 'gpio' }
+
+/**
+ * 把任意来源的 `type` 归一成契约类型，无法识别时兜底 `other`。
+ * 不变式：返回值一定在 `PIN_TYPE_FILL` / `PIN_TYPE_LABEL` 里存在；否则引脚会静默变黑。
+ */
+export function normalizePinType(raw: unknown): PinType {
+  const key = String(raw ?? '').trim().toLowerCase()
+  if (Object.hasOwn(PIN_TYPE_LABEL, key)) {
+    return key as PinType
+  }
+  return PIN_TYPE_ALIASES[key] ?? 'other'
+}
+
+/** 归一化单个引脚（含它的 `variants`），在数据入口调用一次，下游无需再防 */
+export function normalizePin(pin: Pin): Pin {
+  const type = normalizePinType(pin.type)
+  if (!pin.variants) {
+    return { ...pin, type }
+  }
+  return {
+    ...pin,
+    type,
+    variants: Object.fromEntries(
+      Object.entries(pin.variants).map(([key, variant]) => [key, { ...variant, type: normalizePinType(variant.type) }]),
+    ),
+  }
+}
+
+/** 批量归一化引脚（store 在芯片文档载入时调用；新旧两份数据都能正确着色） */
+export function normalizePins(pins: Pin[]): Pin[] {
+  return pins.map(normalizePin)
+}
+
 /** 功能大类 → 中文名（用于 Inspector 的分组标签） */
 export const FUNCTION_TYPE_LABEL: Record<string, string> = {
   adc: 'ADC',

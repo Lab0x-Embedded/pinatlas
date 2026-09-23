@@ -1,6 +1,6 @@
 import type { Pin } from '~/types/pinatlas'
 import { describe, expect, it } from 'vitest'
-import { groupFunctions, pinAliases, pinPrimary, splitPinName } from '~/utils/pin-types'
+import { groupFunctions, normalizePins, normalizePinType, PIN_TYPE_FILL, PIN_TYPE_LABEL, PIN_TYPE_ORDER, PIN_TYPE_TEXT, pinAliases, pinPrimary, splitPinName } from '~/utils/pin-types'
 
 /**
  * 主名/别名拆分：前端与数据层（pinatlas-data scripts/lib/normalize.mjs 的 splitPinName）同规则。
@@ -79,5 +79,61 @@ describe('功能分组与类型', () => {
     expect(groups.map(g => g.peripheral)).toEqual(['TIM2', 'RCC'])
     expect(groups[0].functions).toHaveLength(2)
     expect(groups[1].system).toBe(true)
+  })
+})
+
+/**
+ * type 归一化：线上踩过「GPIO 全是黑块」（docs/07 §17）。
+ * 根因是数据 v1.0.0 用 `io`、契约 v1.1.0 用 `gpio`，查表失败 → class 为空 → SVG 默认填充（黑）。
+ */
+describe('normalizePinType：把历史/未知类型收口', () => {
+  it('v1.0.0 的 io 视作 gpio', () => {
+    expect(normalizePinType('io')).toBe('gpio')
+    expect(normalizePinType('IO')).toBe('gpio')
+    expect(normalizePinType(' io ')).toBe('gpio')
+  })
+
+  it('契约内的类型原样返回', () => {
+    for (const type of PIN_TYPE_ORDER) {
+      expect(normalizePinType(type)).toBe(type)
+    }
+  })
+
+  it('未知/缺失类型兜底 other，不会返回 undefined', () => {
+    for (const raw of ['bogus', '', null, undefined, 42, {}, 'toString', 'hasOwnProperty']) {
+      expect(normalizePinType(raw)).toBe('other')
+    }
+  })
+
+  it('不变式：归一化结果一定有配色和标签（否则会渲染成黑块）', () => {
+    for (const raw of ['io', 'gpio', 'power', 'clock', 'bogus', null]) {
+      const type = normalizePinType(raw)
+      expect(PIN_TYPE_FILL[type]).toBeTruthy()
+      expect(PIN_TYPE_LABEL[type]).toBeTruthy()
+    }
+    for (const type of PIN_TYPE_ORDER) {
+      expect(PIN_TYPE_FILL[type]).toBeTruthy()
+      expect(PIN_TYPE_TEXT[type]).toBeTruthy()
+    }
+  })
+
+  it('variants 里的类型一起归一（变体切到 NC / 旧枚举都跟着正确着色）', () => {
+    // 故意用 unknown 当输入：模拟线上拿到的旧 JSON（type 是 contract 之外的 'io'）
+    const rawLegacyDoc: unknown = [{
+      position: '1',
+      pad: 'PA0',
+      name: 'PA0',
+      type: 'io',
+      functions: [],
+      variants: {
+        PINREMAP: { name: 'NC', type: 'nc', functions: [] },
+        PINREMAP_10_12: { name: 'PA9', type: 'io', functions: [] },
+      },
+    }]
+    const [normalized] = normalizePins(rawLegacyDoc as Pin[])
+    expect(normalized.type).toBe('gpio')
+    expect(normalized.variants!.PINREMAP.type).toBe('nc')
+    expect(normalized.variants!.PINREMAP_10_12.type).toBe('gpio')
+    expect(PIN_TYPE_FILL[normalized.variants!.PINREMAP_10_12.type]).toBeTruthy()
   })
 })

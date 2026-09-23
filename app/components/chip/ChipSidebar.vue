@@ -91,17 +91,18 @@ function chipSubtitle(entry: { package: string | null, pinCount: number | null, 
         </p>
         <ul class="space-y-0.5">
           <li v-for="entry in group.chips" :key="entry.chip">
-            <button
+            <Button
               type="button"
+              variant="ghost"
               :class="cn(
-                'w-full rounded-md px-2 py-1.5 text-left transition-colors',
+                'h-auto w-full flex-col items-stretch justify-start gap-0 rounded-md px-2 py-1.5 text-left whitespace-normal',
                 store.currentChipId === entry.chip ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
               )"
               @click="store.selectChip(entry.chip)"
             >
               <span class="block truncate text-sm">{{ entry.displayName }}</span>
               <span class="text-muted-foreground block truncate text-[11px]">{{ chipSubtitle(entry) }}</span>
-            </button>
+            </Button>
           </li>
         </ul>
       </div>
@@ -114,9 +115,10 @@ function chipSubtitle(entry: { package: string | null, pinCount: number | null, 
     <!-- 系列树：未加载的系列只显示计数，展开才拉数据 -->
     <div v-else class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
       <div v-for="group in store.familyGroups" :key="group.family" class="mb-1">
-        <button
+        <Button
           type="button"
-          class="hover:bg-accent/60 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors"
+          variant="ghost"
+          class="h-auto w-full justify-start gap-2 rounded-md px-2 py-1.5 text-left font-normal"
           @click="toggle(group.family)"
         >
           <svg
@@ -129,7 +131,7 @@ function chipSubtitle(entry: { package: string | null, pinCount: number | null, 
           <span class="flex-1 truncate text-sm">{{ group.family }}</span>
           <span v-if="group.loading" class="border-border size-3 animate-spin rounded-full border-2 border-t-transparent" />
           <span v-else class="text-muted-foreground text-[11px] tabular-nums">{{ group.count }}</span>
-        </button>
+        </Button>
 
         <div v-if="expanded.has(group.family)" class="mt-0.5 ml-3 border-l pl-2">
           <template v-if="group.loaded">
@@ -139,17 +141,18 @@ function chipSubtitle(entry: { package: string | null, pinCount: number | null, 
               </p>
               <ul class="space-y-0.5">
                 <li v-for="entry in lineGroup.chips" :key="entry.chip">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     :class="cn(
-                      'w-full rounded-md px-2 py-1.5 text-left transition-colors',
+                      'h-auto w-full flex-col items-stretch justify-start gap-0 rounded-md px-2 py-1.5 text-left whitespace-normal',
                       store.currentChipId === entry.chip ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
                     )"
                     @click="store.selectChip(entry.chip)"
                   >
                     <span class="block truncate text-sm">{{ entry.displayName }}</span>
                     <span class="text-muted-foreground block truncate text-[11px]">{{ chipSubtitle(entry) }}</span>
-                  </button>
+                  </Button>
                 </li>
               </ul>
             </div>

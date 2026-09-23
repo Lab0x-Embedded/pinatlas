@@ -63,11 +63,13 @@ function variantOf(position: string, key: string | null) {
       </div>
 
       <Tabs :default-value="variantTabs[0]?.key ?? 'base'">
-        <TabsList class="w-full">
+        <!-- 变体名可能很长（PINREMAP_10_12 …）：容器可横向滚动 + 小字号，避免在 340px 右栏被挤破 -->
+        <TabsList class="w-full justify-start overflow-x-auto">
           <TabsTrigger
             v-for="tab in variantTabs"
             :key="tab.key ?? 'base'"
             :value="tab.key ?? 'base'"
+            class="px-2 text-xs"
             @click="store.setVariant(tab.key)"
           >
             {{ tab.label }}

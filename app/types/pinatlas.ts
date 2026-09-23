@@ -88,6 +88,8 @@ export interface ChipIndexEntry {
   packageKind: PackageKind | null
   pinCount: number | null
   flashKb: number | null
+  /** 订货号（数据 v1.3.0 起，可省略）：用户抄丝印搜索靠它（STM32F103C8T6 / C8T6） */
+  mpns?: string[]
   part: string
 }
 

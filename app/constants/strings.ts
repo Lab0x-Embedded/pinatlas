@@ -4,6 +4,8 @@ export const strings = {
   tagline: '芯片引脚数据库与可视化查询',
   searchPlaceholder: '搜索型号，如 STM32F103C8 / F103 / LQFP48',
   searchShortcut: '⌘K',
+  searchHint: '↑↓ 选择 · Enter 打开 · Esc 清空；多个关键词用空格分隔（如 F103 LQFP48），也支持订货号（C8T6 / VGT6）',
+  expandAll: '展开其余',
   families: '系列',
   chips: '型号',
   packages: '封装',

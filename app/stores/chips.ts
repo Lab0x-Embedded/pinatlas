@@ -1,4 +1,7 @@
 import type { ChipDoc, ChipIndexEntry, DatasetManifest, FamilyShard, Pin } from '~/types/pinatlas'
+import type { ChipSearchMatch } from '~/utils/chip-search'
+import { buildDataBase, DATA_HOST_STORAGE_KEY, DATA_SOURCES, hostOf } from '~/constants/data-sources'
+import { searchChips } from '~/utils/chip-search'
 import { fetchJson } from '~/utils/http'
 import { normalizePins } from '~/utils/pin-types'
 
@@ -14,8 +17,11 @@ import { normalizePins } from '~/utils/pin-types'
  */
 export const useChipsStore = defineStore('chips', () => {
   const runtimeConfig = useRuntimeConfig()
-  const dataBase = computed(() => String(runtimeConfig.public.dataBase || '').replace(/\/+$/, ''))
   const dataTag = computed(() => String(runtimeConfig.public.dataTag || ''))
+  /** 构建期的默认数据根（CDN 或同源快照）+ 路径前缀，见 nuxt.config.ts */
+  const defaultDataBase = computed(() => String(runtimeConfig.public.dataBase || '').replace(/\/+$/, ''))
+  const dataPath = computed(() => String(runtimeConfig.public.dataPath || ''))
+  const configuredHost = computed(() => String(runtimeConfig.public.dataHost || ''))
 
   const manifest = ref<DatasetManifest | null>(null)
   const shards = ref<Record<string, ChipIndexEntry[]>>({})
@@ -35,6 +41,25 @@ export const useChipsStore = defineStore('chips', () => {
   const chipCache = new Map<string, ChipDoc>()
   const shardPromises = new Map<string, Promise<void>>()
 
+  /**
+   * 数据源（CDN 镜像）可在页头切换，见 `~/constants/data-sources`。
+   *   - `savedHost === null`：没选过 → 用构建期默认（nuxt.config 的 dataBase，本地离线模式就是 /data）
+   *   - 其它：`https://<host><dataPath>`
+   * 只存 host 不存整串 URL，所以换数据 tag（dataPath 变）不会让 localStorage 里的选择失效。
+   */
+  const savedHost = ref<string | null>(null)
+  let hostInitialized = false
+
+  const dataBase = computed(() => {
+    if (savedHost.value === null) {
+      return defaultDataBase.value
+    }
+    return buildDataBase(savedHost.value, dataPath.value, defaultDataBase.value)
+  })
+  const dataHost = computed(() => hostOf(dataBase.value || configuredHost.value))
+  /** 当前生效的数据源（Select 的绑定值）：没选过时就是构建期默认那个镜像 */
+  const dataSource = computed(() => savedHost.value ?? configuredHost.value)
+
   /** 已加载的系列（含芯片数据） */
   const loadedChips = computed(() => Object.values(shards.value).flat())
   const loadedFamilies = computed(() => Object.keys(shards.value))
@@ -53,18 +78,33 @@ export const useChipsStore = defineStore('chips', () => {
     chips: shards.value[shard.family] ?? [],
   })))
 
-  const filteredChips = computed(() => {
-    const q = query.value.trim().toLowerCase()
-    const list = loadedChips.value
-    if (!q) {
-      return list
+  /**
+   * 搜索结果（多词 AND + 相关度排序 + 高亮区间），见 `~/utils/chip-search`。
+   * 键盘导航（↑↓）用这份扁平有序列表，所以顺序必须稳定：相关度 → 子系列 → 主名。
+   */
+  const searchMatches = computed(() => searchChips(loadedChips.value, query.value))
+
+  /** 只取条目（未搜索时就是全部已加载型号，顺序同索引） */
+  const filteredChips = computed(() => searchMatches.value.map(match => match.entry))
+
+  /** 搜索结果的 line 分组：组内按相关度，组间按该组最高分（相关度高的系列先出现） */
+  const searchGroups = computed(() => {
+    const groups = new Map<string, ChipSearchMatch[]>()
+    for (const match of searchMatches.value) {
+      const key = match.entry.line || '未分组'
+      const bucket = groups.get(key) ?? []
+      bucket.push(match)
+      groups.set(key, bucket)
     }
-    return list.filter(entry =>
-      entry.chip.toLowerCase().includes(q)
-      || entry.displayName.toLowerCase().includes(q)
-      || (entry.line ?? '').toLowerCase().includes(q)
-      || (entry.package ?? '').toLowerCase().includes(q),
-    )
+    return [...groups.entries()]
+      .map(([line, matches]) => ({
+        line,
+        matches: [...matches].sort((a, b) =>
+          b.score - a.score
+          || String(a.entry.package).localeCompare(String(b.entry.package))
+          || (a.entry.flashKb ?? 0) - (b.entry.flashKb ?? 0)),
+      }))
+      .sort((a, b) => Math.max(...b.matches.map(m => m.score)) - Math.max(...a.matches.map(m => m.score)))
   })
 
   /** 搜索结果的 line 分组 */
@@ -155,6 +195,7 @@ export const useChipsStore = defineStore('chips', () => {
   }
 
   async function loadManifest(force = false) {
+    applySavedHostOnce()
     if (manifest.value && !force) {
       return
     }
@@ -166,6 +207,62 @@ export const useChipsStore = defineStore('chips', () => {
       indexError.value = (error as Error).message
       manifest.value = null
     }
+  }
+
+  /** 首次进入时恢复用户上次选的镜像（只认清单里的值，避免旧版本留下的无效值把数据根拼歪） */
+  function applySavedHostOnce() {
+    if (hostInitialized) {
+      return
+    }
+    hostInitialized = true
+    if (typeof window === 'undefined') {
+      return
+    }
+    try {
+      const saved = window.localStorage.getItem(DATA_HOST_STORAGE_KEY)
+      if (saved !== null && DATA_SOURCES.some(source => source.value === saved)) {
+        savedHost.value = saved
+      }
+    }
+    catch {
+      // 隐私模式下 localStorage 可能直接抛错：忽略，用构建期默认
+    }
+  }
+
+  /** 切换数据源：清掉已加载的清单/分片/芯片缓存，再用新 host 重新拉一遍（保留当前型号与选中引脚） */
+  async function setDataSource(host: string) {
+    if (host === dataSource.value) {
+      return
+    }
+    savedHost.value = host
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(DATA_HOST_STORAGE_KEY, host)
+      }
+      catch {
+        // 存不进去不影响本次会话
+      }
+    }
+    resetDataset()
+    await loadManifest(true)
+    const id = currentChipId.value
+    if (id) {
+      currentChipId.value = null
+      await selectChip(id, { keepPin: true })
+    }
+  }
+
+  /** 丢清已加载的数据（换数据源时必须做，否则会把旧 host 的分片和芯片文档混着用） */
+  function resetDataset() {
+    manifest.value = null
+    shards.value = {}
+    chipCache.clear()
+    shardPromises.clear()
+    loadingFamilies.value = new Set()
+    loadingAll.value = false
+    indexError.value = null
+    chip.value = null
+    chipError.value = null
   }
 
   async function ensureShard(family: string) {
@@ -287,6 +384,9 @@ export const useChipsStore = defineStore('chips', () => {
   return {
     dataBase,
     dataTag,
+    dataHost,
+    dataSource,
+    setDataSource,
     manifest,
     families,
     familyGroups,
@@ -306,6 +406,8 @@ export const useChipsStore = defineStore('chips', () => {
     variantKey,
     loadedChips,
     filteredChips,
+    searchMatches,
+    searchGroups,
     groupedChips,
     sameDieChips,
     effectivePins,

@@ -5,19 +5,21 @@ import { appDescription, appName } from './app/constants/index'
 
 // 数据来自 Lab0x-Embedded/pinatlas-data（见 docs/02-data-contract.md）。
 //
-// 默认走 jsDelivr 的 **fastly** 镜像（国内直连实测最快：1.4s，主站 cdn.jsdelivr.net 2.5s，
-// gcore 3.9s）。可选镜像：fastly / cdn / gcore / testingcf，用 NUXT_PUBLIC_DATA_CDN_HOST 切换。
+// 默认走 jsDelivr 的 **fastly** 镜像；**运行时还能在页头切换**（见 app/constants/data-sources.ts：
+// 5 个 jsDelivr 镜像 + 同源快照），因为镜像在不同运营商/地区快慢完全不同，用户自己切比我们赌一个准。
 // 想完全离线/自托管：`pnpm data:pull` 把快照放进 public/data/，再设 NUXT_PUBLIC_DATA_LOCAL=true。
 //
 // 数据版本固定成**不可变 tag**，不用 main：jsDelivr 对分支引用有缓存，同一 URL 会拿到新旧两份
 // 数据（docs/07 §9），曾导致线上 37 个 GPIO 脚渲染成黑块（docs/07 §17）。
-// 数据仓库每次同步后打 `data-YYYY.MM.DD`，要跟新数据就更新这里的 tag，或用 NUXT_PUBLIC_DATA_TAG 覆盖。
-const dataTag = process.env.NUXT_PUBLIC_DATA_TAG || 'data-2026.09.23.2'
+// 数据仓库每次同步后打 `data-YYYY.MM.DD`（同一天第二次发布加 `.N` 后缀），要跟新数据就更新这里的
+// tag，或用 NUXT_PUBLIC_DATA_TAG 覆盖。
+const dataTag = process.env.NUXT_PUBLIC_DATA_TAG || 'data-2026.09.23.3'
 const dataHost = process.env.NUXT_PUBLIC_DATA_CDN_HOST || 'fastly.jsdelivr.net'
+// jsDelivr 上这份数据集的路径前缀（换 host 时只换前缀，其余拼法不变）
+const dataPath = `/gh/Lab0x-Embedded/pinatlas-data@${dataTag}/data`
+const dataLocal = process.env.NUXT_PUBLIC_DATA_LOCAL === 'true'
 const dataBase = process.env.NUXT_PUBLIC_DATA_BASE
-  || (process.env.NUXT_PUBLIC_DATA_LOCAL === 'true'
-    ? '/data'
-    : `https://${dataHost}/gh/Lab0x-Embedded/pinatlas-data@${dataTag}/data`)
+  || (dataLocal ? '/data' : `https://${dataHost}${dataPath}`)
 
 export default defineNuxtConfig({
   modules: [
@@ -68,6 +70,9 @@ export default defineNuxtConfig({
     public: {
       dataBase,
       dataTag,
+      dataHost,
+      dataPath,
+      dataLocal,
     },
   },
 

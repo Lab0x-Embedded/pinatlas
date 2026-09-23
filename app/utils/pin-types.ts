@@ -60,19 +60,34 @@ export const FUNCTION_TYPE_LABEL: Record<string, string> = {
  *   "PC13-TAMPER-RTC" → primary=PC13, aliases=[TAMPER, RTC]
  *   "VDD/VDDA"        → primary=VDD,  aliases=[VDDA]
  *   "VSSA/VREF-"      → primary=VSSA, aliases=[VREF-]（负参考的连字符属于名字）
+ *   "PA13 (JTMS/SWDIO)" → primary=PA13, aliases=[JTMS, SWDIO]（括号注释，先摘再拆！）
  *   "PA11 [PA9]"      → primary=PA11, variantOf=PA9
  */
 export function splitPinName(name: string) {
-  const raw = String(name || '').trim()
-  // 手动解析方括号（正则版会触发回溯告警，且行为等价）："PA11 [PA9]" → head=PA11, variantOf=PA9
-  const open = raw.lastIndexOf('[')
-  const closable = open >= 0 && raw.endsWith(']')
-  const head = closable ? raw.slice(0, open).trim() : raw
-  const variantOf = closable ? raw.slice(open + 1, raw.length - 1).trim().toUpperCase() || null : null
+  let raw = String(name || '').trim()
 
-  const segments = head.split('/').map(s => s.trim()).filter(Boolean)
-  const dashParts = (segments[0] || head).split('-').map(s => s.trim())
-  const primary = (dashParts[0] || head).toUpperCase()
+  // 1) 方括号：重映射标注（"PA11 [PA9]"）
+  const bracket = raw.lastIndexOf('[')
+  const hasBracket = bracket >= 0 && raw.endsWith(']')
+  const variantOf = hasBracket ? raw.slice(bracket + 1, raw.length - 1).trim().toUpperCase() || null : null
+  if (hasBracket) {
+    raw = raw.slice(0, bracket).trim()
+  }
+
+  // 2) 圆括号：行尾注释（"PA13 (JTMS/SWDIO)"、"PC14-OSC32_IN (PC14)"），内容当别名
+  const paren = raw.lastIndexOf('(')
+  const hasParen = paren >= 0 && raw.endsWith(')')
+  const parenAliases = hasParen
+    ? raw.slice(paren + 1, raw.length - 1).split(/[/-]/).map(s => s.trim().toUpperCase()).filter(Boolean)
+    : []
+  if (hasParen) {
+    raw = raw.slice(0, paren).trim()
+  }
+
+  // 3) 斜杠 = 第二个网络名；连字符 = 额外功能提示
+  const segments = raw.split('/').map(s => s.trim()).filter(Boolean)
+  const dashParts = (segments[0] || raw).split('-').map(s => s.trim())
+  const primary = (dashParts[0] || raw).toUpperCase()
 
   const aliases: string[] = []
   for (const part of dashParts.slice(1)) {
@@ -85,7 +100,13 @@ export function splitPinName(name: string) {
       aliases.push(part.toUpperCase())
     }
   }
-  return { primary, aliases: [...new Set(aliases)], variantOf }
+  for (const part of parenAliases) {
+    if (part) {
+      aliases.push(part)
+    }
+  }
+
+  return { primary, aliases: [...new Set(aliases)].filter(a => a && a !== primary), variantOf }
 }
 
 /** 主显示名：优先用数据里的 primary，旧数据（schema 1.0.0）现场拆一次 */

@@ -23,6 +23,18 @@ describe('splitPinName：把混在名字里的三类信息拆开', () => {
     expect(splitPinName('VSSA/VREF-')).toEqual({ primary: 'VSSA', aliases: ['VREF-'], variantOf: null })
   })
 
+  it('圆括号注释要先摘再拆（L4/H7 家族的真实形态，曾把 AF join 键拆坏）', () => {
+    expect(splitPinName('PA13 (JTMS/SWDIO)')).toEqual({ primary: 'PA13', aliases: ['JTMS', 'SWDIO'], variantOf: null })
+    expect(splitPinName('PH0-OSC_IN (PH0)')).toEqual({ primary: 'PH0', aliases: ['OSC_IN'], variantOf: null })
+    expect(splitPinName('PC14-OSC32_IN (PC14)')).toEqual({ primary: 'PC14', aliases: ['OSC32_IN'], variantOf: null })
+  })
+
+  it('主名不带任何注释残留（AF join 键就是它）', () => {
+    for (const name of ['PA13 (JTMS/SWDIO)', 'PC14-OSC32_IN (PC14)', 'PA11 [PA9]', 'VDD/VDDA', 'PA0-WKUP']) {
+      expect(splitPinName(name).primary).toMatch(/^[A-Z][A-Z0-9_+]*$/)
+    }
+  })
+
   it('方括号是重映射标注，指向另一个 pad 而不是别名', () => {
     expect(splitPinName('PA11 [PA9]')).toEqual({ primary: 'PA11', aliases: [], variantOf: 'PA9' })
   })

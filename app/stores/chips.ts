@@ -3,6 +3,7 @@ import type { ChipSearchMatch } from '~/utils/chip-search'
 import { buildDataBase, DATA_HOST_STORAGE_KEY, DATA_SOURCES, hostOf } from '~/constants/data-sources'
 import { searchChips } from '~/utils/chip-search'
 import { fetchJson } from '~/utils/http'
+import { searchPins } from '~/utils/pin-search'
 import { normalizePins } from '~/utils/pin-types'
 
 /**
@@ -179,6 +180,41 @@ export const useChipsStore = defineStore('chips', () => {
     }
     return [...keys].sort()
   })
+
+  /**
+   * 引脚搜索（当前型号内）：输入框在芯片名那一行的右端（index.vue），图上的淡化/强调在
+   * PackageDiagram（两处都要用，所以状态放在 store）。大封装（LQFP144/208/BGA）图上不画
+   * pad 名与引脚号，只能靠它找某个脚。
+   */
+  const pinQuery = ref('')
+  const pinHits = computed(() => searchPins(effectivePins.value, pinQuery.value))
+  const pinSearchActive = computed(() => pinQuery.value.trim().length > 0)
+  const pinHitPositions = computed(() => new Set(pinHits.value.map(hit => hit.pin.position)))
+  /** ↑↓ 在命中结果里移动的下标（-1 = 未进入键盘模式） */
+  const pinHitIndex = ref(-1)
+  const activePinHit = computed(() => pinHits.value[pinHitIndex.value]?.pin ?? null)
+
+  function selectPinHit(index: number) {
+    const hit = pinHits.value[index]
+    if (hit) {
+      pinHitIndex.value = index
+      selectedPosition.value = hit.pin.position
+    }
+  }
+
+  /** 唯一的命中就直接选中它（省一次 ↑↓ 或点图） */
+  watch(pinHits, (hits) => {
+    pinHitIndex.value = -1
+    const [only] = hits
+    if (pinSearchActive.value && hits.length === 1 && only) {
+      selectedPosition.value = only.pin.position
+    }
+  })
+
+  function clearPinSearch() {
+    pinQuery.value = ''
+    pinHitIndex.value = -1
+  }
 
   const hasAfData = computed(() => {
     for (const pin of chip.value?.pins ?? []) {
@@ -433,6 +469,14 @@ export const useChipsStore = defineStore('chips', () => {
     selectedPin,
     variantsAvailable,
     hasAfData,
+    pinQuery,
+    pinHits,
+    pinSearchActive,
+    pinHitPositions,
+    pinHitIndex,
+    activePinHit,
+    selectPinHit,
+    clearPinSearch,
     familyForChip,
     loadManifest,
     ensureShard,

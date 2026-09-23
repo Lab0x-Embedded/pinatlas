@@ -19,6 +19,29 @@ const syncing = ref(false)
 const loading = computed(() =>
   (!store.manifest && !store.indexError) || store.loadingChip || store.resolving)
 
+/** 引脚搜索的键盘交互：↑↓ 在命中间移动并选中，Enter 选中当前，Esc 清空 */
+function onPinSearchKeydown(event: KeyboardEvent) {
+  const total = store.pinHits.length
+  if (!total) {
+    return
+  }
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault()
+    const step = event.key === 'ArrowDown' ? 1 : -1
+    const current = store.pinHitIndex
+    store.selectPinHit(current < 0 ? (step > 0 ? 0 : total - 1) : (current + step + total) % total)
+    return
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    store.selectPinHit(store.pinHitIndex < 0 ? 0 : store.pinHitIndex)
+    return
+  }
+  if (event.key === 'Escape') {
+    store.clearPinSearch()
+  }
+}
+
 async function bootstrap() {
   // 参数必须在「loadManifest 之后、selectChip 之前」取好，两个坑都实测过：
   //   ① 生产构建是预渲染页（nitro.prerender '/'）：onMounted 时 router 还没把地址栏的 query
@@ -101,6 +124,26 @@ useHead({ title: `${strings.appName} · ${strings.tagline}` })
           </Badge>
         </template>
         <span v-else class="text-muted-foreground text-sm">{{ strings.selectChip }}</span>
+
+        <!-- 引脚搜索：放芯片名 / 封装 / 脚数这一行的右端（大封装图上不画 pad 名与引脚号，
+             只能靠搜 + 图上的淡化强调找某个脚）。命中计数**贴在输入框内**（绝对定位）：
+             单独占一行会挤，而且它出现/消失时会把下面的引脚图顶一下（看起来会"跳"） -->
+        <div v-if="store.chip" class="relative ml-auto w-full sm:w-64">
+          <Input
+            v-model="store.pinQuery"
+            type="search"
+            class="h-7 pr-16 pl-2 text-xs"
+            :placeholder="strings.pinSearchPlaceholder"
+            aria-label="搜索引脚"
+            :title="strings.pinSearchNav"
+            @keydown="onPinSearchKeydown"
+          />
+          <span
+            v-if="store.pinSearchActive"
+            class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-[10px] tabular-nums"
+            :class="store.pinHits.length ? 'text-muted-foreground' : 'text-destructive'"
+          >{{ store.pinHits.length }}/{{ store.effectivePins.length }}</span>
+        </div>
       </div>
 
       <Alert v-if="store.chipError" variant="destructive">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Pin } from '~/types/pinatlas'
 import type { PinSlot } from '~/utils/package-layout'
 import type { PinCategoryId } from '~/utils/pin-categories'
 import { strings } from '~/constants/strings'
@@ -40,6 +41,15 @@ const container = ref<HTMLElement | null>(null)
 const hover = ref<{ position: string, x: number, y: number } | null>(null)
 
 const pinnedPosition = computed(() => store.selectedPosition)
+
+/** 搜索与类别过滤不要同时淡化两套，否则"哪些是命中"读不出来：搜索优先 */
+function isDimmed(pin: Pin) {
+  if (store.pinSearchActive) {
+    return !store.pinHitPositions.has(pin.position)
+  }
+  return Boolean(activeType.value && activeType.value !== pin.type)
+    || (categoryActive.value && !matchesCategory(pin, activeCategory.value))
+}
 
 const perSide = computed(() => layout.value.meta.pinsPerSide ?? 0)
 const showPadLabels = computed(() => (layout.value.meta.kind === 'grid' ? false : perSide.value <= 24))
@@ -91,12 +101,12 @@ function pinClass(slot: PinSlot) {
   if (!pin) {
     return PIN_TYPE_FILL.other
   }
-  // 两套过滤（引脚类型 / 功能类别）互斥生效，避免同时淡化造成误读
-  const dimmed = Boolean(activeType.value && activeType.value !== pin.type)
-    || (categoryActive.value && !matchesCategory(pin, activeCategory.value))
+  // 两套过滤（引脚类型 / 功能类别）互斥生效，避免同时淡化造成误读；
+  // 搜索优先于这两者（见 isDimmed）
+  const dimmed = isDimmed(pin)
   const dim = dimmed ? 'opacity-25' : ''
-  // 类别过滤时把命中的引脚描边加粗，淡化之外还有一层正反馈
-  const emphasis = !dimmed && categoryActive.value ? 'stroke-[3.5]' : ''
+  // 类别过滤 / 引脚搜索时把命中的引脚描边加粗，淡化之外还有一层正反馈
+  const emphasis = !dimmed && (categoryActive.value || store.pinSearchActive) ? 'stroke-[3.5]' : ''
   const nc = pin.type === 'nc' ? '[stroke-dasharray:6_4]' : ''
   return cn(PIN_TYPE_FILL[pin.type], dim, emphasis, nc)
 }
@@ -197,216 +207,216 @@ const ariaLabel = computed(() =>
         {{ category.label }}
         <span class="opacity-70 tabular-nums">{{ category.count }}</span>
       </Button>
-    </div>
 
-    <div
-      ref="container"
-      class="relative mx-auto w-full max-w-[860px]"
-      @mousemove="onMove"
-      @mouseleave="hover = null"
-    >
-      <svg
-        :viewBox="`0 0 ${VIEW} ${VIEW}`"
-        class="h-auto w-full select-none"
-        role="img"
-        :aria-label="ariaLabel"
-        :data-slots="layout.slots.length"
-        :data-kind="layout.meta.kind"
-        :data-number-font="policy.numberFont.toFixed(1)"
+      <div
+        ref="container"
+        class="relative mx-auto w-full max-w-[860px]"
+        @mousemove="onMove"
+        @mouseleave="hover = null"
       >
-        <!-- 封装本体 -->
-        <rect
-          :x="bodyRect.x"
-          :y="bodyRect.y"
-          :width="bodyRect.width"
-          :height="bodyRect.height"
-          rx="16"
-          class="fill-muted/40 stroke-border"
-          stroke-width="3"
-        />
-        <!-- pin 1 标记（左上角，与数据手册一致：俯视逆时针） -->
-        <circle :cx="bodyRect.x + 34" :cy="bodyRect.y + 34" r="11" class="fill-foreground" />
-
-        <!-- 本体中心的丝印：型号 + 封装/引脚数（与实物芯片顶面一致；网格封装的球会盖住，不放） -->
-        <g v-if="centerMark" text-anchor="middle" :data-center="centerMark.title">
-          <text
-            :x="centerMark.x"
-            :y="centerMark.titleY"
-            :font-size="centerMark.titleFont"
-            class="fill-muted-foreground/70 font-medium"
-          >{{ centerMark.title }}</text>
-          <text
-            :x="centerMark.x"
-            :y="centerMark.subtitleY"
-            :font-size="centerMark.subtitleFont"
-            class="fill-muted-foreground/55"
-          >{{ centerMark.subtitle }}</text>
-        </g>
-
-        <!-- 网格封装的外围坐标头：球号画不下时靠它读位置（BGA 数据手册也是这么标的） -->
-        <g v-if="layout.meta.kind === 'grid'" class="fill-muted-foreground">
-          <text
-            v-for="label in rowLabels"
-            :key="`row-${label}`"
-            :x="bodyRect.x - 12"
-            :y="(rowCenters.get(label) ?? 0) + policy.axisFont * 0.35"
-            text-anchor="end"
-            :font-size="policy.axisFont"
-          >{{ label }}</text>
-          <text
-            v-for="label in rowLabels"
-            :key="`row-r-${label}`"
-            :x="bodyRect.x + bodyRect.width + 12"
-            :y="(rowCenters.get(label) ?? 0) + policy.axisFont * 0.35"
-            text-anchor="start"
-            :font-size="policy.axisFont"
-          >{{ label }}</text>
-          <text
-            v-for="col in colNumbers"
-            :key="`col-${col}`"
-            :x="colCenters.get(col) ?? 0"
-            :y="bodyRect.y - policy.axisFont * 0.4"
-            text-anchor="middle"
-            :font-size="policy.axisFont"
-          >{{ col }}</text>
-          <text
-            v-for="col in colNumbers"
-            :key="`col-b-${col}`"
-            :x="colCenters.get(col) ?? 0"
-            :y="bodyRect.y + bodyRect.height + policy.axisFont * 1.15"
-            text-anchor="middle"
-            :font-size="policy.axisFont"
-          >{{ col }}</text>
-        </g>
-
-        <g
-          v-for="slot in layout.slots"
-          :key="slot.position"
-          class="cursor-pointer outline-none"
-          role="button"
-          tabindex="0"
-          :data-position="slot.position"
-          :aria-label="`引脚 ${slot.position} ${slotLabel(slot)}`"
-          @click="store.selectPin(slot.position)"
-          @keydown.enter.prevent="store.selectPin(slot.position)"
-          @keydown.space.prevent="store.selectPin(slot.position)"
-          @mouseenter="onEnter(slot.position, $event)"
-          @focus="store.selectPin(slot.position)"
+        <svg
+          :viewBox="`0 0 ${VIEW} ${VIEW}`"
+          class="h-auto w-full select-none"
+          role="img"
+          :aria-label="ariaLabel"
+          :data-slots="layout.slots.length"
+          :data-kind="layout.meta.kind"
+          :data-number-font="policy.numberFont.toFixed(1)"
         >
+          <!-- 封装本体 -->
           <rect
-            v-if="slot.shape === 'rect'"
-            :x="slot.x"
-            :y="slot.y"
-            :width="slot.w"
-            :height="slot.h"
-            rx="3"
-            stroke-width="2"
-            :class="pinClass(slot)"
-          />
-          <circle
-            v-else
-            :cx="slot.cx"
-            :cy="slot.cy"
-            :r="slot.w / 2"
-            stroke-width="2"
-            :class="pinClass(slot)"
-          />
-          <!-- 选中态 -->
-          <rect
-            v-if="pinnedPosition === slot.position"
-            :x="slot.x - 5"
-            :y="slot.y - 5"
-            :width="slot.w + 10"
-            :height="slot.h + 10"
-            rx="5"
-            class="fill-none stroke-ring"
+            :x="bodyRect.x"
+            :y="bodyRect.y"
+            :width="bodyRect.width"
+            :height="bodyRect.height"
+            rx="16"
+            class="fill-muted/40 stroke-border"
             stroke-width="3"
           />
+          <!-- pin 1 标记（左上角，与数据手册一致：俯视逆时针） -->
+          <circle :cx="bodyRect.x + 34" :cy="bodyRect.y + 34" r="11" class="fill-foreground" />
 
-          <template v-if="slot.side">
+          <!-- 本体中心的丝印：型号 + 封装/引脚数（与实物芯片顶面一致；网格封装的球会盖住，不放） -->
+          <g v-if="centerMark" text-anchor="middle" :data-center="centerMark.title">
             <text
-              v-if="policy.showNumber"
-              :x="numStyle(slot).x"
-              :y="numStyle(slot).y"
-              :text-anchor="numStyle(slot).anchor"
-              :transform="rotateTransform(numStyle(slot))"
-              :font-size="policy.numberFont"
-              class="fill-muted-foreground tabular-nums"
+              :x="centerMark.x"
+              :y="centerMark.titleY"
+              :font-size="centerMark.titleFont"
+              class="fill-muted-foreground/70 font-medium"
+            >{{ centerMark.title }}</text>
+            <text
+              :x="centerMark.x"
+              :y="centerMark.subtitleY"
+              :font-size="centerMark.subtitleFont"
+              class="fill-muted-foreground/55"
+            >{{ centerMark.subtitle }}</text>
+          </g>
+
+          <!-- 网格封装的外围坐标头：球号画不下时靠它读位置（BGA 数据手册也是这么标的） -->
+          <g v-if="layout.meta.kind === 'grid'" class="fill-muted-foreground">
+            <text
+              v-for="label in rowLabels"
+              :key="`row-${label}`"
+              :x="bodyRect.x - 12"
+              :y="(rowCenters.get(label) ?? 0) + policy.axisFont * 0.35"
+              text-anchor="end"
+              :font-size="policy.axisFont"
+            >{{ label }}</text>
+            <text
+              v-for="label in rowLabels"
+              :key="`row-r-${label}`"
+              :x="bodyRect.x + bodyRect.width + 12"
+              :y="(rowCenters.get(label) ?? 0) + policy.axisFont * 0.35"
+              text-anchor="start"
+              :font-size="policy.axisFont"
+            >{{ label }}</text>
+            <text
+              v-for="col in colNumbers"
+              :key="`col-${col}`"
+              :x="colCenters.get(col) ?? 0"
+              :y="bodyRect.y - policy.axisFont * 0.4"
+              text-anchor="middle"
+              :font-size="policy.axisFont"
+            >{{ col }}</text>
+            <text
+              v-for="col in colNumbers"
+              :key="`col-b-${col}`"
+              :x="colCenters.get(col) ?? 0"
+              :y="bodyRect.y + bodyRect.height + policy.axisFont * 1.15"
+              text-anchor="middle"
+              :font-size="policy.axisFont"
+            >{{ col }}</text>
+          </g>
+
+          <g
+            v-for="slot in layout.slots"
+            :key="slot.position"
+            class="cursor-pointer outline-none"
+            role="button"
+            tabindex="0"
+            :data-position="slot.position"
+            :aria-label="`引脚 ${slot.position} ${slotLabel(slot)}`"
+            @click="store.selectPin(slot.position)"
+            @keydown.enter.prevent="store.selectPin(slot.position)"
+            @keydown.space.prevent="store.selectPin(slot.position)"
+            @mouseenter="onEnter(slot.position, $event)"
+            @focus="store.selectPin(slot.position)"
+          >
+            <rect
+              v-if="slot.shape === 'rect'"
+              :x="slot.x"
+              :y="slot.y"
+              :width="slot.w"
+              :height="slot.h"
+              rx="3"
+              stroke-width="2"
+              :class="pinClass(slot)"
+            />
+            <circle
+              v-else
+              :cx="slot.cx"
+              :cy="slot.cy"
+              :r="slot.w / 2"
+              stroke-width="2"
+              :class="pinClass(slot)"
+            />
+            <!-- 选中态 -->
+            <rect
+              v-if="pinnedPosition === slot.position"
+              :x="slot.x - 5"
+              :y="slot.y - 5"
+              :width="slot.w + 10"
+              :height="slot.h + 10"
+              rx="5"
+              class="fill-none stroke-ring"
+              stroke-width="3"
+            />
+
+            <template v-if="slot.side">
+              <text
+                v-if="policy.showNumber"
+                :x="numStyle(slot).x"
+                :y="numStyle(slot).y"
+                :text-anchor="numStyle(slot).anchor"
+                :transform="rotateTransform(numStyle(slot))"
+                :font-size="policy.numberFont"
+                class="fill-muted-foreground tabular-nums"
+              >{{ slot.position }}</text>
+              <text
+                v-if="policy.showPadName && padText(slot)"
+                :x="padStyle(slot).x"
+                :y="padStyle(slot).y"
+                :text-anchor="padStyle(slot).anchor"
+                :transform="rotateTransform(padStyle(slot))"
+                :font-size="policy.padFont"
+                class="fill-foreground"
+              >{{ padText(slot) }}</text>
+            </template>
+            <text
+              v-else-if="policy.showBallText"
+              :x="slot.cx"
+              :y="slot.cy + policy.ballFont * 0.35"
+              text-anchor="middle"
+              :font-size="policy.ballFont"
+              class="fill-foreground tabular-nums"
             >{{ slot.position }}</text>
-            <text
-              v-if="policy.showPadName && padText(slot)"
-              :x="padStyle(slot).x"
-              :y="padStyle(slot).y"
-              :text-anchor="padStyle(slot).anchor"
-              :transform="rotateTransform(padStyle(slot))"
-              :font-size="policy.padFont"
-              class="fill-foreground"
-            >{{ padText(slot) }}</text>
-          </template>
-          <text
-            v-else-if="policy.showBallText"
-            :x="slot.cx"
-            :y="slot.cy + policy.ballFont * 0.35"
-            text-anchor="middle"
-            :font-size="policy.ballFont"
-            class="fill-foreground tabular-nums"
-          >{{ slot.position }}</text>
-        </g>
-      </svg>
+          </g>
+        </svg>
 
-      <!-- 悬停提示（只在进入引脚时更新，不跟随每一帧鼠标移动重排） -->
-      <div
-        v-if="hover && hoveredPin"
-        class="border-border bg-popover text-popover-foreground pointer-events-none absolute z-20 w-56 rounded-md border px-3 py-2 text-xs shadow-md"
-        :style="{ left: `${hover.x + 12}px`, top: `${hover.y + 12}px` }"
-      >
-        <p class="font-medium">
-          {{ hoveredPin.position }} · {{ pinPrimary(hoveredPin) }}
-        </p>
-        <p class="text-muted-foreground">
-          {{ PIN_TYPE_LABEL[hoveredPin.type] }}
-          <template v-if="pinAliases(hoveredPin).length">
-            · 别名 {{ pinAliases(hoveredPin).join(' / ') }}
-          </template>
-          <template v-if="hoveredPin.variantOf">
-            · 重映射 {{ hoveredPin.variantOf }}
-          </template>
-        </p>
-        <ul v-if="hoveredPin.functions.length" class="mt-1 space-y-0.5">
-          <li v-for="fn in hoveredPin.functions.slice(0, 3)" :key="`${fn.peripheral}_${fn.signal}`">
-            {{ fn.peripheral }}<span class="text-muted-foreground"> · {{ functionLabel(fn) }}</span>
-          </li>
-          <li v-if="hoveredPin.functions.length > 3" class="text-muted-foreground">
-            还有 {{ hoveredPin.functions.length - 3 }} 个…
-          </li>
-        </ul>
+        <!-- 悬停提示（只在进入引脚时更新，不跟随每一帧鼠标移动重排） -->
+        <div
+          v-if="hover && hoveredPin"
+          class="border-border bg-popover text-popover-foreground pointer-events-none absolute z-20 w-56 rounded-md border px-3 py-2 text-xs shadow-md"
+          :style="{ left: `${hover.x + 12}px`, top: `${hover.y + 12}px` }"
+        >
+          <p class="font-medium">
+            {{ hoveredPin.position }} · {{ pinPrimary(hoveredPin) }}
+          </p>
+          <p class="text-muted-foreground">
+            {{ PIN_TYPE_LABEL[hoveredPin.type] }}
+            <template v-if="pinAliases(hoveredPin).length">
+              · 别名 {{ pinAliases(hoveredPin).join(' / ') }}
+            </template>
+            <template v-if="hoveredPin.variantOf">
+              · 重映射 {{ hoveredPin.variantOf }}
+            </template>
+          </p>
+          <ul v-if="hoveredPin.functions.length" class="mt-1 space-y-0.5">
+            <li v-for="fn in hoveredPin.functions.slice(0, 3)" :key="`${fn.peripheral}_${fn.signal}`">
+              {{ fn.peripheral }}<span class="text-muted-foreground"> · {{ functionLabel(fn) }}</span>
+            </li>
+            <li v-if="hoveredPin.functions.length > 3" class="text-muted-foreground">
+              还有 {{ hoveredPin.functions.length - 3 }} 个…
+            </li>
+          </ul>
+        </div>
       </div>
-    </div>
 
-    <!-- 图例（可点击过滤） -->
-    <div class="flex flex-wrap items-center gap-1.5">
-      <Button
-        v-for="type in PIN_TYPE_ORDER"
-        :key="type"
-        type="button"
-        :variant="activeType === type ? 'default' : 'outline'"
-        :class="cn('h-6 gap-1 px-2 text-[11px] font-normal', activeType === type ? '' : PIN_TYPE_TEXT[type])"
-        @click="toggleType(type)"
-      >
-        <span class="size-2 rounded-full border" :class="PIN_TYPE_TEXT[type]" />
-        {{ PIN_TYPE_LABEL[type] }}
-        <span class="opacity-70 tabular-nums">{{ typeCount.get(type) ?? 0 }}</span>
-      </Button>
-    </div>
+      <!-- 图例（可点击过滤） -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        <Button
+          v-for="type in PIN_TYPE_ORDER"
+          :key="type"
+          type="button"
+          :variant="activeType === type ? 'default' : 'outline'"
+          :class="cn('h-6 gap-1 px-2 text-[11px] font-normal', activeType === type ? '' : PIN_TYPE_TEXT[type])"
+          @click="toggleType(type)"
+        >
+          <span class="size-2 rounded-full border" :class="PIN_TYPE_TEXT[type]" />
+          {{ PIN_TYPE_LABEL[type] }}
+          <span class="opacity-70 tabular-nums">{{ typeCount.get(type) ?? 0 }}</span>
+        </Button>
+      </div>
 
-    <div class="text-muted-foreground space-y-0.5 text-[11px]">
-      <p>{{ strings.disclaimer }}</p>
-      <p v-if="layout.meta.kind === 'grid'">
-        {{ strings.gridViewNote }}
-      </p>
-      <p v-for="warning in layout.meta.warnings" :key="warning" class="text-destructive">
-        {{ strings.layoutWarning }}：{{ warning }}
-      </p>
+      <div class="text-muted-foreground space-y-0.5 text-[11px]">
+        <p>{{ strings.disclaimer }}</p>
+        <p v-if="layout.meta.kind === 'grid'">
+          {{ strings.gridViewNote }}
+        </p>
+        <p v-for="warning in layout.meta.warnings" :key="warning" class="text-destructive">
+          {{ strings.layoutWarning }}：{{ warning }}
+        </p>
+      </div>
     </div>
   </div>
 </template>

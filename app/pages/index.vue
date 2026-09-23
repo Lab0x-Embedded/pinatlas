@@ -132,7 +132,7 @@ useHead({ title: `${strings.appName} · ${strings.tagline}` })
           <Input
             v-model="store.pinQuery"
             type="search"
-            class="h-7 pr-16 pl-2 text-xs"
+            class="h-7 pr-10 pl-2 text-xs"
             :placeholder="strings.pinSearchPlaceholder"
             aria-label="搜索引脚"
             :title="strings.pinSearchNav"

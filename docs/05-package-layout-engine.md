@@ -117,5 +117,5 @@ io / power / ground / reset / boot / mono / nc / other
 - 纯函数：`layoutPackage(input) → { slots, meta: { kind, view, warnings, pinsPerSide, rows, cols } }`，与 Vue **和渲染方式都解耦**，便于单测。
 - 逻辑坐标系固定 `0..1000`：Canvas 用 `setTransform(dpr*scale, …)` 映射，CSS 尺寸变化只影响 scale，不影响几何计算。
 - **引脚朝向**：QFP 引脚垂直伸出本体 → 左右两边是横向长条（`w = pinLength, h = pinWidth`），上下两边是竖向长条。写反会导致同列压叠（64 高 > 48.3 行距），已有断言（`test/package-layout.spec.ts`）。
-- **字号策略**（`utils/label-policy.ts`）：按行距/格子反推字号，行距 <26 不画 pad 名、格子 <26 不画球号；`fitText()` 截断超宽文本（SVG `<text>` 不自动收缩）。
+- **字号策略**（`utils/label-policy.ts`）：按行距/格子/引脚块反推字号；pad 名写在引脚块里（块宽放不下字高就不画，LQFP208 块宽 6.9 就是不画的那类）、格子 <26 不画球号；`fitText()` 截断超宽文本（SVG `<text>` 不自动收缩）。
 - 大封装（TFBGA436）不画 pad 名（按 `pinsPerSide`/网格半径判断），功能列表放悬停提示（HTML 覆盖层，最多前 3 个 + "还有 N 个"）。

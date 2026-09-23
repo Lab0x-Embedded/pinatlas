@@ -18,8 +18,8 @@
 | `position.side` / `index` | 数据里没有；前端布局引擎算 `slot.side`，左边同理可给 `index` | **建议不写进数据**（同一 die 多个封装，side/index 随封装变），作为视图模型派生（§2.4） |
 | 数据校验器 | 数据仓库有 per-chip 校验（position 唯一/格式/网格编码），失败降级为告警 | 需要按你的清单补全并在 CI 里作为**门禁**（§2.5） |
 | 四边通用布局（不写 `if (pinCount === 32)`） | 已经是 `perSide = ceil(count / sides)`，quad/dual/grid 三套 | 达标 |
-| Pin Number 在外侧、Pin Name 在本体内侧 | 已实现（`labelStyle()`，见 docs/04 §5） | 达标 |
-| 密封装降级（只显号/点） | 有字号策略（`labelPolicy`）：行距 <26 单位不画 pad 名 | 需要「Density Mode」显式化（§3.2） |
+| Pin Number 在块外侧、Pin Name 在块内 | 已实现（`numberLabelBox()` / `padLabelBox()`，见 docs/04 §5） | 达标 |
+| 密封装降级（只显号/点） | 有字号策略（`labelPolicy`）：块宽放不下字高就不画 pad 名（LQFP48 21.3 / LQFP100 9.0 / LQFP208 不画） | 需要「Density Mode」显式化（§3.2） |
 | Pin 1 标识 | 已画黑点（本体内左上角） | 需随封装朝向旋转（后置，见 §6 第 5 阶段） |
 | 按功能搜索并高亮所有对应脚 | store 只有型号级搜索 | 需要功能级搜索 + 列表 + 图上高亮（§4.4） |
 | Pin Matrix 表格与图/详情联动 | 无 | 新增（§4.3） |
@@ -94,7 +94,7 @@ AF 覆盖率静默下降（`PA13 (JTMS/SWDIO)` 曾被拆成 `PA13 (JTMS`，整�
 ### 3.1 已完成（保持）
 
 - 四边通用：`perSide = ceil(count / sides)`，无 `pinCount` 分支；quad/dual/grid 三套几何。
-- 引脚号在外侧、pad 名在本体内侧；左右两边引脚为横向长条（伸出本体）。
+- 引脚号在块外侧、pad 名写在块内（块内垂直居中；上下两排竖排），本体中心印型号丝印；左右两边引脚为横向长条（伸出本体）。
 - 字号策略 `utils/label-policy.ts`：字号随行距/格子反推，放不下就不画（解决密封装压叠）。
 - BGA 行列坐标头；变体合并（`position` 唯一）；稀疏网格告警。
 

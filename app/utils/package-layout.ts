@@ -36,6 +36,9 @@ export interface LayoutResult {
     rows?: number
     cols?: number
     pinsPerSide?: number
+    /** 引脚块尺寸（quad/dual 用；pad 名就写在块里，字号按它反推，见 docs/04 §5） */
+    pinWidth?: number
+    pinLength?: number
     warnings: string[]
   }
   viewBox: { width: number, height: number }
@@ -190,7 +193,7 @@ export function layoutPackage(input: { kind: PackageKind, pins: Pin[] }): Layout
 
   return {
     slots,
-    meta: { kind, view: 'top', pinsPerSide: perSide, warnings },
+    meta: { kind, view: 'top', pinsPerSide: perSide, pinWidth, pinLength, warnings },
     viewBox: { width: VIEW, height: VIEW },
   }
 }

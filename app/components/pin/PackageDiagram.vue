@@ -2,7 +2,7 @@
 import type { PinSlot } from '~/utils/package-layout'
 import { strings } from '~/constants/strings'
 import { cn } from '~/lib/utils'
-import { fitText, labelPolicy } from '~/utils/label-policy'
+import { fitText, labelPolicy, numberLabelBox, padLabelBox, rotateTransform } from '~/utils/label-policy'
 import { bodyRect, layoutPackage, sortedRowLabels, VIEW } from '~/utils/package-layout'
 import { functionLabel, PIN_TYPE_FILL, PIN_TYPE_LABEL, PIN_TYPE_ORDER, PIN_TYPE_TEXT, pinAliases, pinPrimary } from '~/utils/pin-types'
 
@@ -90,33 +90,33 @@ function pinClass(slot: PinSlot) {
   return cn(PIN_TYPE_FILL[pin.type], dim, nc)
 }
 
-/** 引脚号/pad 名的位置：四边外侧标号、内侧标名；偏移量随字号缩放 */
-function labelStyle(slot: PinSlot) {
-  const number = policy.value.numberFont
-  const pad = policy.value.padFont
-  switch (slot.side) {
-    case 'left':
-      return {
-        number: { x: slot.x - 8, y: slot.cy + number * 0.35, anchor: 'end' as const },
-        pad: { x: bodyRect.x + 14, y: slot.cy + pad * 0.35, anchor: 'start' as const },
-      }
-    case 'right':
-      return {
-        number: { x: slot.x + slot.w + 8, y: slot.cy + number * 0.35, anchor: 'start' as const },
-        pad: { x: bodyRect.x + bodyRect.width - 14, y: slot.cy + pad * 0.35, anchor: 'end' as const },
-      }
-    case 'top':
-      return {
-        number: { x: slot.cx, y: slot.y - number * 0.4, anchor: 'middle' as const },
-        pad: { x: slot.cx, y: bodyRect.y + pad * 1.4, anchor: 'middle' as const },
-      }
-    default:
-      return {
-        number: { x: slot.cx, y: slot.y + slot.h + number * 1.1, anchor: 'middle' as const },
-        pad: { x: slot.cx, y: bodyRect.y + bodyRect.height - pad * 0.6, anchor: 'middle' as const },
-      }
+/** pad 名写在块里（块内垂直居中）；引脚号在块外侧，方向与同一条边的 pad 名一致 */
+const padStyle = (slot: PinSlot) => padLabelBox(slot, policy.value.padFont)
+const numStyle = (slot: PinSlot) => numberLabelBox(slot, policy.value.numberFont)
+
+/**
+ * 本体中心的"丝印"：型号 + 封装/引脚数（实物芯片顶面就是这么印的）。
+ * 名字搬进引脚块后本体内侧空出来了，这里正好放它；字号按型号长度和本体宽反推。
+ * 网格封装不放（球阵铺满本体，会与丝印互相盖住）。
+ */
+const centerMark = computed(() => {
+  const doc = store.chip
+  if (!doc || layout.value.meta.kind === 'grid') {
+    return null
   }
-}
+  const title = doc.chip
+  const titleFont = Math.max(12, Math.min((bodyRect.width * 0.72) / Math.max(1, title.length * 0.58), 44))
+  const centerY = bodyRect.y + bodyRect.height / 2
+  return {
+    title,
+    subtitle: `${doc.package} · ${doc.pinCount} 脚`,
+    x: bodyRect.x + bodyRect.width / 2,
+    titleFont,
+    subtitleFont: Math.max(9, titleFont * 0.46),
+    titleY: centerY - titleFont * 0.15,
+    subtitleY: centerY + titleFont * 0.85,
+  }
+})
 
 /** 图上只画主名（v1.1.0 的 primary；旧数据现场拆分），别名与变体标注交给 hover / Inspector */
 function padText(slot: PinSlot) {
@@ -124,7 +124,8 @@ function padText(slot: PinSlot) {
   if (!pin) {
     return ''
   }
-  return fitText(pinPrimary(pin), policy.value.padMaxWidth, policy.value.padFont)
+  // 名字写在块里，可用的就是块长（超了截断；引脚号仍在块外侧，两者不会混）
+  return fitText(pinPrimary(pin), policy.value.padMaxLength, policy.value.padFont)
 }
 
 function slotLabel(slot: PinSlot) {
@@ -181,6 +182,22 @@ const ariaLabel = computed(() =>
         />
         <!-- pin 1 标记（左上角，与数据手册一致：俯视逆时针） -->
         <circle :cx="bodyRect.x + 34" :cy="bodyRect.y + 34" r="11" class="fill-foreground" />
+
+        <!-- 本体中心的丝印：型号 + 封装/引脚数（与实物芯片顶面一致；网格封装的球会盖住，不放） -->
+        <g v-if="centerMark" text-anchor="middle" :data-center="centerMark.title">
+          <text
+            :x="centerMark.x"
+            :y="centerMark.titleY"
+            :font-size="centerMark.titleFont"
+            class="fill-muted-foreground/70 font-medium"
+          >{{ centerMark.title }}</text>
+          <text
+            :x="centerMark.x"
+            :y="centerMark.subtitleY"
+            :font-size="centerMark.subtitleFont"
+            class="fill-muted-foreground/55"
+          >{{ centerMark.subtitle }}</text>
+        </g>
 
         <!-- 网格封装的外围坐标头：球号画不下时靠它读位置（BGA 数据手册也是这么标的） -->
         <g v-if="layout.meta.kind === 'grid'" class="fill-muted-foreground">
@@ -265,17 +282,19 @@ const ariaLabel = computed(() =>
           <template v-if="slot.side">
             <text
               v-if="policy.showNumber"
-              :x="labelStyle(slot).number.x"
-              :y="labelStyle(slot).number.y"
-              :text-anchor="labelStyle(slot).number.anchor"
+              :x="numStyle(slot).x"
+              :y="numStyle(slot).y"
+              :text-anchor="numStyle(slot).anchor"
+              :transform="rotateTransform(numStyle(slot))"
               :font-size="policy.numberFont"
               class="fill-muted-foreground tabular-nums"
             >{{ slot.position }}</text>
             <text
               v-if="policy.showPadName && padText(slot)"
-              :x="labelStyle(slot).pad.x"
-              :y="labelStyle(slot).pad.y"
-              :text-anchor="labelStyle(slot).pad.anchor"
+              :x="padStyle(slot).x"
+              :y="padStyle(slot).y"
+              :text-anchor="padStyle(slot).anchor"
+              :transform="rotateTransform(padStyle(slot))"
               :font-size="policy.padFont"
               class="fill-foreground"
             >{{ padText(slot) }}</text>

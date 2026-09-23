@@ -14,7 +14,6 @@ const formatted = computed(() =>
     <a class="hover:text-foreground underline underline-offset-2" :href="repoUrl" target="_blank" rel="noreferrer">pinatlas</a>
     <span aria-hidden="true">·</span>
     <a class="hover:text-foreground underline underline-offset-2" :href="dataRepoUrl" target="_blank" rel="noreferrer">pinatlas-data</a>
-    <span class="hidden sm:inline">（主源 LibrePCB/stm-db ＋ embassy-rs AF 补全）</span>
     <span class="ml-auto flex items-center gap-2">
       <span v-if="store.dataTag">{{ strings.dataVersion }}：{{ store.dataTag }}</span>
       <span v-if="formatted">· {{ formatted }}</span>

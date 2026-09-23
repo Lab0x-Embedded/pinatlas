@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { PinSlot } from '~/utils/package-layout'
+import type { PinCategoryId } from '~/utils/pin-categories'
 import { strings } from '~/constants/strings'
 import { cn } from '~/lib/utils'
 import { fitText, labelPolicy, numberLabelBox, padLabelBox, rotateTransform } from '~/utils/label-policy'
 import { bodyRect, layoutPackage, sortedRowLabels, VIEW } from '~/utils/package-layout'
+import { categoryCounts, matchesCategory } from '~/utils/pin-categories'
 import { functionLabel, PIN_TYPE_FILL, PIN_TYPE_LABEL, PIN_TYPE_ORDER, PIN_TYPE_TEXT, pinAliases, pinPrimary } from '~/utils/pin-types'
 
 /**
@@ -30,6 +32,10 @@ const layout = computed(() => layoutPackage({
 const pinsByPosition = computed(() => new Map(store.effectivePins.map(pin => [pin.position, pin])))
 
 const activeType = ref<string | null>(null)
+/** 功能类别过滤（图上方那排：GND / UART / I2C …）；'all' = 不过滤 */
+const activeCategory = ref<PinCategoryId>('all')
+const categories = computed(() => categoryCounts(store.effectivePins))
+const categoryActive = computed(() => activeCategory.value !== 'all')
 const container = ref<HTMLElement | null>(null)
 const hover = ref<{ position: string, x: number, y: number } | null>(null)
 
@@ -85,9 +91,30 @@ function pinClass(slot: PinSlot) {
   if (!pin) {
     return PIN_TYPE_FILL.other
   }
-  const dim = activeType.value && activeType.value !== pin.type ? 'opacity-25' : ''
+  // 两套过滤（引脚类型 / 功能类别）互斥生效，避免同时淡化造成误读
+  const dimmed = Boolean(activeType.value && activeType.value !== pin.type)
+    || (categoryActive.value && !matchesCategory(pin, activeCategory.value))
+  const dim = dimmed ? 'opacity-25' : ''
+  // 类别过滤时把命中的引脚描边加粗，淡化之外还有一层正反馈
+  const emphasis = !dimmed && categoryActive.value ? 'stroke-[3.5]' : ''
   const nc = pin.type === 'nc' ? '[stroke-dasharray:6_4]' : ''
-  return cn(PIN_TYPE_FILL[pin.type], dim, nc)
+  return cn(PIN_TYPE_FILL[pin.type], dim, emphasis, nc)
+}
+
+/** 点类别：再点一次取消；同时清掉类型过滤（两者互斥） */
+function toggleCategory(id: PinCategoryId) {
+  activeCategory.value = activeCategory.value === id ? 'all' : id
+  activeType.value = null
+}
+
+/** 点类型图例：再点一次取消；同时清掉类别过滤 */
+function toggleType(type: string) {
+  activeType.value = activeType.value === type ? null : type
+  activeCategory.value = 'all'
+}
+
+function isCategoryActive(id: PinCategoryId) {
+  return id === 'all' ? !categoryActive.value : activeCategory.value === id
 }
 
 /** pad 名写在块里（块内垂直居中）；引脚号在块外侧，方向与同一条边的 pad 名一致 */
@@ -155,6 +182,28 @@ const ariaLabel = computed(() =>
 
 <template>
   <div class="flex flex-col gap-3">
+    <!-- 功能类别过滤：点一下高亮对应引脚（命中加粗、其余淡化），再点取消；计数 0 的禁用不隐藏 -->
+    <div class="flex flex-wrap items-center gap-1.5">
+      <button
+        v-for="category in categories"
+        :key="category.id"
+        type="button"
+        :disabled="category.disabled"
+        :title="category.hint"
+        class="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] transition-colors"
+        :class="cn(
+          category.disabled
+            ? 'text-muted-foreground/50 cursor-not-allowed'
+            : 'text-muted-foreground hover:text-foreground',
+          isCategoryActive(category.id) && 'bg-primary text-primary-foreground border-ring',
+        )"
+        @click="toggleCategory(category.id)"
+      >
+        {{ category.label }}
+        <span class="tabular-nums">{{ category.count }}</span>
+      </button>
+    </div>
+
     <div
       ref="container"
       class="relative mx-auto w-full max-w-[860px]"
@@ -346,8 +395,8 @@ const ariaLabel = computed(() =>
         :key="type"
         type="button"
         class="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] transition-colors"
-        :class="cn(activeType === type && 'bg-accent text-accent-foreground', PIN_TYPE_TEXT[type])"
-        @click="activeType = activeType === type ? null : type"
+        :class="cn(activeType === type && 'bg-primary text-primary-foreground', PIN_TYPE_TEXT[type])"
+        @click="toggleType(type)"
       >
         <span class="size-2 rounded-full border" :class="PIN_TYPE_TEXT[type]" />
         {{ PIN_TYPE_LABEL[type] }}

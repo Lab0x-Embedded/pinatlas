@@ -64,64 +64,74 @@ export const FUNCTION_TYPE_LABEL: Record<string, string> = {
  *   "PC2_C"             → primary=PC2（_C 是模拟开关后缀，主名取焊盘 token）
  *   "PA11 [PA9]"      → primary=PA11, variantOf=PA9
  */
-export function splitPinName(name: string) {
-  let raw = String(name || '').trim()
-
-  // 1) 方括号：重映射标注（"PA11 [PA9]"）
+/** 摘掉行尾的 [] 重映射标注（"PA11 [PA9]" → head=PA11, variantOf=PA9） */
+function stripVariantMark(raw: string): { head: string, variantOf: string | null } {
   const bracket = raw.lastIndexOf('[')
-  const hasBracket = bracket >= 0 && raw.endsWith(']')
-  const variantOf = hasBracket ? raw.slice(bracket + 1, raw.length - 1).trim().toUpperCase() || null : null
-  if (hasBracket) {
-    raw = raw.slice(0, bracket).trim()
+  if (bracket < 0 || !raw.endsWith(']')) {
+    return { head: raw, variantOf: null }
   }
+  return {
+    head: raw.slice(0, bracket).trim(),
+    variantOf: raw.slice(bracket + 1, raw.length - 1).trim().toUpperCase() || null,
+  }
+}
 
-  // 2) 圆括号：行尾注释（"PA13 (JTMS/SWDIO)"、"PC14-OSC32_IN (PC14)"），内容当别名
+/** 摘掉行尾圆括号注释并拆成别名（"PA13 (JTMS/SWDIO)" → head=PA13, aliases=[JTMS, SWDIO]） */
+function stripParenNote(raw: string): { head: string, aliases: string[] } {
   const paren = raw.lastIndexOf('(')
-  const hasParen = paren >= 0 && raw.endsWith(')')
-  const parenAliases = hasParen
-    ? raw.slice(paren + 1, raw.length - 1).split(/[/-]/).map(s => s.trim().toUpperCase()).filter(Boolean)
-    : []
-  if (hasParen) {
-    raw = raw.slice(0, paren).trim()
+  if (paren < 0 || !raw.endsWith(')')) {
+    return { head: raw, aliases: [] }
   }
+  const aliases = raw.slice(paren + 1, raw.length - 1)
+    .split(/[/-]/)
+    .map(s => s.trim().toUpperCase())
+    .filter(Boolean)
+  return { head: raw.slice(0, paren).trim(), aliases }
+}
 
-  const aliases: string[] = []
-  // 3) 主名优先取"字母 + 数字"的焊盘 token（AF join 的键）：PC2_C → PC2
-  const token = /^([A-Za-z]+\d+)/.exec(raw)
-  let primary: string
-  if (token?.[1]) {
-    primary = token[1].toUpperCase()
-    // 下划线属于信号名（OSC_IN），只能按 / 和 - 拆；再剥掉首尾的 _ 与空白
-    for (const part of raw.slice(token[1].length).split(/[/-]/).map(s => s.trim().replace(/^[\s_]+|[\s_]+$/g, '').toUpperCase())) {
-      if (part.length > 1) {
-        aliases.push(part)
-      }
-    }
-  }
-  else {
-    // 4) 无焊盘 token（VDD/VDDA、VSSA/VREF-、PDR_ON）：按 / 再按 - 拆，第一段为主名
-    const segments = raw.split('/').map(s => s.trim()).filter(Boolean)
-    const dashParts = (segments[0] || raw).split('-').map(s => s.trim())
-    primary = (dashParts[0] || raw).toUpperCase()
-    for (const part of dashParts.slice(1)) {
-      if (part) {
-        aliases.push(part.toUpperCase())
-      }
-    }
-    for (const part of segments.slice(1)) {
-      if (part) {
-        aliases.push(part.toUpperCase())
-      }
-    }
-  }
+/** 按 / 和 - 拆（下划线属于信号名，不拆）：第一段是主名，其余是别名 */
+function splitBySeparators(raw: string): { primary: string, aliases: string[] } {
+  const segments = raw.split('/').map(s => s.trim()).filter(Boolean)
+  const dashParts = (segments[0] || raw).split('-').map(s => s.trim())
+  const aliases = [
+    ...dashParts.slice(1).filter(Boolean).map(s => s.toUpperCase()),
+    ...segments.slice(1).filter(Boolean).map(s => s.toUpperCase()),
+  ]
+  return { primary: (dashParts[0] || raw).toUpperCase(), aliases }
+}
 
-  for (const part of parenAliases) {
-    if (part) {
-      aliases.push(part)
-    }
+/**
+ * 主名优先取"字母 + 数字"的焊盘 token：这正是 embassy AF join 的键。
+ *   "PC2_C"     → PC2 + 别名（_C 是模拟开关后缀，单字符别名丢弃）
+ *   "PB2_BOOT1" → PB2 + [BOOT1]
+ *   "VDD/VDDA"  → 无 token，退回按分隔符拆
+ */
+function splitByPadToken(raw: string): { primary: string, aliases: string[] } | null {
+  const token = /^([a-z]+\d+)/i.exec(raw)
+  const pad = token?.[1]
+  if (!pad) {
+    return null
   }
+  const aliases = raw.slice(pad.length)
+    .split(/[/-]/)
+    .map(s => s.trim().replace(/^[\s_]+|[\s_]+$/g, '').toUpperCase())
+    .filter(part => part.length > 1)
+  return { primary: pad.toUpperCase(), aliases }
+}
 
-  return { primary, aliases: [...new Set(aliases)].filter(a => a && a !== primary), variantOf }
+/**
+ * 主名拆分（与数据层 `splitPinName()` 同规则，前端作为旧数据兜底 + 零信任校验）。
+ *
+ * 顺序很重要，别调换（踩过坑，见 docs/07 §16）：
+ *   1. 摘 [] 重映射标注 → 2. 摘 () 行尾注释 → 3. 优先取焊盘 token → 4. 否则按 / 和 - 拆
+ * primary 必须干净，因为它就是 AF join 的键。
+ */
+export function splitPinName(name: string) {
+  const { head: withoutVariant, variantOf } = stripVariantMark(String(name || '').trim())
+  const { head, aliases: noteAliases } = stripParenNote(withoutVariant)
+  const split = splitByPadToken(head) ?? splitBySeparators(head)
+  const aliases = [...new Set([...split.aliases, ...noteAliases])].filter(a => a && a !== split.primary)
+  return { primary: split.primary, aliases, variantOf }
 }
 
 /** 主显示名：优先用数据里的 primary，旧数据（schema 1.0.0）现场拆一次 */

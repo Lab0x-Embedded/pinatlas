@@ -9,6 +9,16 @@ const DEFAULT_CHIP = 'STM32F103C8Tx'
 
 const syncing = ref(false)
 
+/**
+ * 中间区域的加载态判定：清单还没到（index.json 在路上）/ 正在解析型号 / 正在拉芯片文档，
+ * 都算 loading。
+ * 之前只判 loadingChip || resolving，首屏最前面那段（清单还没回来时）会被当成空态，
+ * 于是先闪一下「从左侧选择一个型号」，看起来就是"没有 loading 效果"。
+ * 清单报错时不进 loading，否则会一直转圈（错误由列表区和下方 Alert 呈现）。
+ */
+const loading = computed(() =>
+  (!store.manifest && !store.indexError) || store.loadingChip || store.resolving)
+
 async function bootstrap() {
   // 参数必须在「loadManifest 之后、selectChip 之前」取好，两个坑都实测过：
   //   ① 生产构建是预渲染页（nitro.prerender '/'）：onMounted 时 router 还没把地址栏的 query
@@ -103,12 +113,13 @@ useHead({ title: `${strings.appName} · ${strings.tagline}` })
         </AlertDescription>
       </Alert>
 
-      <div v-else-if="store.loadingChip || store.resolving" class="space-y-3">
-        <Skeleton class="mx-auto aspect-square w-full max-w-[720px] rounded-xl" />
-        <Skeleton class="h-4 w-2/3" />
-        <p class="text-muted-foreground text-center text-xs">
-          {{ strings.loading }}
-        </p>
+      <!-- 加载态：套用与引脚图**同一个外层容器**（border + rounded-xl + p-4）与同一块方形区域
+           （mx-auto w-full max-w-[860px] aspect-square，就是 SVG 待会儿占的位置），里面只放一个
+           转圈。不放文案、也不铺灰色骨架：灰骨架看着像"中间堆了一坨灰"，尺寸对不上时 SVG 冒出来还很突兀。 -->
+      <div v-else-if="loading" class="border-border rounded-xl border p-4">
+        <div class="mx-auto flex aspect-square w-full max-w-[860px] items-center justify-center">
+          <span class="border-muted-foreground/40 size-12 animate-spin rounded-full border-[3px] border-t-transparent" aria-hidden="true" />
+        </div>
       </div>
 
       <div v-else-if="store.chip" class="border-border rounded-xl border p-4">

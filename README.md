@@ -49,13 +49,12 @@
 
 ## 技术栈
 
-|      |                                                                                  |
 | ---- | -------------------------------------------------------------------------------- |
-| 框架 | Nuxt 4.5 + Vue 3.5 + TypeScript（`future.compatibilityVersion: 4`）              |
-| 样式 | Tailwind v4 + shadcn-vue（reka-ui），令牌定义在 `app/assets/css/main.css`        |
-| 状态 | Pinia（`app/stores/chips.ts`）                                                   |
-| 数据 | 客户端按需拉取 jsDelivr 上的数据集，**固定不可变 tag**（见下）                   |
-| PWA  | @vite-pwa/nuxt（workbox，离线 + autoUpdate）                                     |
+| 框架 | Nuxt 4.5 + Vue 3.5 + TypeScript（`future.compatibilityVersion: 4`） |
+| 样式 | Tailwind v4 + shadcn-vue（reka-ui），令牌定义在 `app/assets/css/main.css` |
+| 状态 | Pinia（`app/stores/chips.ts`） |
+| 数据 | 客户端按需拉取 jsDelivr 上的数据集，**固定不可变 tag**（见下） |
+| PWA | @vite-pwa/nuxt（workbox，离线 + autoUpdate） |
 | 规范 | ESLint（@antfu/eslint-config）、Vitest、`nuxt typecheck`，CI 跑 lint + typecheck |
 
 ## 快速开始

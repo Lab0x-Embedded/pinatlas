@@ -127,8 +127,9 @@ export function layoutPackage(input: { kind: PackageKind, pins: Pin[] }): Layout
     const within = index % perSide
     let x = 0
     let y = 0
-    let w = pinWidth
-    let h = pinLength
+    // 每个分支都会赋值，这里只声明
+    let w: number
+    let h: number
     let side: PinSide
 
     if (kind === 'dual') {
@@ -144,21 +145,30 @@ export function layoutPackage(input: { kind: PackageKind, pins: Pin[] }): Layout
       switch (sideIndex) {
         case 0:
           side = 'left'
+          // QFP 引脚垂直伸出本体：左右两边是「横向」长条（长=pinLength），不是竖条
+          w = pinLength
+          h = pinWidth
           x = BODY_INSET - pinLength
           y = BODY_INSET + within * pitch + (pitch - pinWidth) / 2
           break
         case 1:
           side = 'bottom'
+          w = pinWidth
+          h = pinLength
           x = BODY_INSET + within * pitch + (pitch - pinWidth) / 2
           y = VIEW - BODY_INSET
           break
         case 2:
           side = 'right'
+          w = pinLength
+          h = pinWidth
           x = VIEW - BODY_INSET
           y = VIEW - BODY_INSET - (within + 1) * pitch + (pitch - pinWidth) / 2
           break
         default:
           side = 'top'
+          w = pinWidth
+          h = pinLength
           x = VIEW - BODY_INSET - (within + 1) * pitch + (pitch - pinWidth) / 2
           y = BODY_INSET - pinLength
           break

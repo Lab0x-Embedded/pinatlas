@@ -1,6 +1,6 @@
 import type { Pin } from '~/types/pinatlas'
 import { describe, expect, it } from 'vitest'
-import { layoutPackage, ROW_LETTERS, rowIndexOf } from '~/utils/package-layout'
+import { bodyRect, layoutPackage, ROW_LETTERS, rowIndexOf } from '~/utils/package-layout'
 import { groupFunctions } from '~/utils/pin-types'
 
 /** 造 n 个引脚，position 为 1..n（线性封装） */
@@ -160,6 +160,58 @@ describe('grid（BGA/WLCSP）：行列取极值，行字母跳过 JEDEC 保留�
     const result = layoutPackage({ kind: 'grid', pins })
     expect(result.meta.cols).toBe(7)
     expect(result.meta.rows).toBe(2)
+  })
+})
+
+describe('引脚朝向（QFP 引脚本体伸出，方向必须对）', () => {
+  const layout = layoutPackage({ kind: 'quad', pins: linearPins(48) })
+  const side = (name: string) => layout.slots.filter(s => s.side === name)
+
+  it('左右两边是横向长条，上下两边是竖向长条', () => {
+    for (const slot of side('left').concat(side('right'))) {
+      expect(slot.w).toBeGreaterThan(slot.h)
+    }
+    for (const slot of side('top').concat(side('bottom'))) {
+      expect(slot.h).toBeGreaterThan(slot.w)
+    }
+  })
+
+  it('引脚贴着本体内侧边缘往外伸，不重叠本体', () => {
+    for (const slot of side('left')) {
+      expect(slot.x + slot.w).toBe(bodyRect.x)
+    }
+    for (const slot of side('right')) {
+      expect(slot.x).toBe(bodyRect.x + bodyRect.width)
+    }
+    for (const slot of side('top')) {
+      expect(slot.y + slot.h).toBe(bodyRect.y)
+    }
+    for (const slot of side('bottom')) {
+      expect(slot.y).toBe(bodyRect.y + bodyRect.height)
+    }
+  })
+
+  it('同一列的引脚不互相压叠（间距里留出空隙）', () => {
+    for (const name of ['left', 'right']) {
+      const sorted = side(name).sort((a, b) => a.y - b.y)
+      for (let i = 1; i < sorted.length; i++) {
+        expect(sorted[i].y - (sorted[i - 1].y + sorted[i - 1].h)).toBeGreaterThan(0)
+      }
+    }
+    const top = side('top').sort((a, b) => a.x - b.x)
+    for (let i = 1; i < top.length; i++) {
+      expect(top[i].x - (top[i - 1].x + top[i - 1].w)).toBeGreaterThan(0)
+    }
+  })
+
+  it('dual 封装两列自外向内并排，同样横向', () => {
+    const dual = layoutPackage({ kind: 'dual', pins: linearPins(16) })
+    for (const slot of dual.slots) {
+      expect(slot.w).toBeGreaterThan(slot.h)
+    }
+    expect(dual.slots.filter(s => s.side === 'left')).toHaveLength(8)
+    expect(dual.slots.find(s => s.position === '1')!.y).toBeLessThan(dual.slots.find(s => s.position === '8')!.y)
+    expect(dual.slots.find(s => s.position === '16')!.y).toBeLessThan(dual.slots.find(s => s.position === '9')!.y)
   })
 })
 

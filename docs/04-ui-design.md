@@ -82,15 +82,18 @@ graph TB
 | 空/错/加载 | 空态给"未收录 + 数据源链接"；错误态给重试；加载用 Skeleton（不要转圈） |
 | AF 未知 | 显示 `—` + 一行说明"该系列上游无 AF 号数据"（**不要显示 AF0**） |
 
-## 5. 引脚图视觉规范（Canvas 渲染）
+## 5. 引脚图视觉规范（SVG 渲染）
 
-渲染方式：**Canvas 2D**（`app/utils/canvas-render.ts`），几何来自纯函数 `layoutPackage()`。
+渲染方式：**SVG**（`app/components/pin/PackageDiagram.vue`），几何来自纯函数 `layoutPackage()`。
+选用理由与 Canvas 试做对比见 `docs/07 §14`。
 
-- 画布按 `devicePixelRatio` 放大后在**逻辑坐标系（0..1000）**里作画（`setTransform` 一次），CSS 尺寸随容器走（ResizeObserver）。
-- 颜色**不写死**：绘制时从 CSS 变量读（`--pin-*`、`--border`、`--ring`…），主题切换重读调色板并重绘。
-- 引脚填充用 `globalAlpha 0.18` 的类型色、描边用本色；`nc` 类型用 `setLineDash([6,4])`；图例过滤时其余类型 `globalAlpha 0.22` 变淡。
-- 命中检测、方向键导航都是几何计算（`hitTestSlots` / `neighborSlot`），见 `docs/05 §8`。
-- 引脚矩形：长边 `18px`（quad 沿边）/ 球 `r=9px`（grid）；间距 `4px`；圆角 `radius-sm`。
+- 逻辑坐标系固定 `0..1000`（`viewBox`），外部用 CSS 缩放；文字由浏览器排版（清晰、可选中、可缩放）。
+- 颜色走 Tailwind class + CSS 变量（`fill-pin-*` / `stroke-pin-*`），明暗主题切换不重绘。
+- 每个引脚是一个 `<g role="button" tabindex="0">`：命中、悬停、聚焦、键盘选中、屏幕阅读器全免费。
+- **字号不写死**：由 `app/utils/label-policy.ts` 按行距/格子反推（引脚号 0.52×行距、pad 名 0.44×行距、球号 0.44×格子，上限 26/22/20，下限 9/9/10）。行距 <26 单位不画 pad 名；格子 <26 不画球号（改由外围行列坐标头 + 悬停读）。
+- **引脚号在本体外侧、pad 名在本体内侧**：这是刻意的，避免混淆"物理编号"与"GPIO 名"。左右两边的引脚是横向长条（垂直伸出本体）。
+- pad 名超宽用 `fitText()` 截断加省略号（SVG `<text>` 不会自动收缩）。
+- 引脚矩形圆角 `radius-sm`；`nc` 类型虚线描边；图例过滤时其余类型 `opacity-25`。
 - 标注：quad/dual 在矩形外侧标 `position`，内侧标 `pad`（空间不足时只标 position + tooltip）；grid 在球心标 `A1/B7`。
 - Pin 1 标记：右上/左上角一个实心小圆 + 一条加粗边框（**方向必须与数据手册一致**，见 05 §4）。
 - 图例（类型色）固定在图下方，可点击筛选高亮（如"只看电源"）。

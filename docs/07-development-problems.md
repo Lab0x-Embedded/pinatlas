@@ -115,6 +115,24 @@
 
 **解法**：改完样式入口/配置后重启 dev server；数据统一走同源 `/data`（见 02-data-contract §1），避免 localhost 与 127.0.0.1 混用。
 
+### 14. 引脚图从 SVG 改为 Canvas（按明确要求迁移）
+
+**背景**：初版用 SVG（每脚一个 `<rect>`/`<circle>`），交互/主题/无障碍都白拿。按要求改成 Canvas。
+
+**代价与补偿**（都在代码里落实了）：
+
+| Canvas 丢掉的 | 补偿做法 |
+|---|---|
+| 元素即命中区 | `hitTestSlots()` 几何反查（矩形点在框内 + slack、球用半径），实测 361 球下无压力 |
+| 每个引脚可聚焦 | 画布 `tabindex="0"` + `neighborSlot()` 方向键导航（四边沿边走、垂直跳对边；网格按方向加权） |
+| 屏幕阅读器可读 | `role="img"` + `aria-label` + `aria-live="polite"` 播报"引脚号/名称/类型/功能数" |
+| class 主题切换 | 绘制时从 CSS 变量读调色板，`colorMode` 变化重读重绘 |
+| 矢量导出 | 未补（`canvas.toDataURL()` 可导出位图；要矢量得另说） |
+
+**顺带的好处**：绘制逻辑只依赖最小 ctx 接口，于是能在 Node 里用记录式假 ctx 做单测（`test/canvas-render.spec.ts`：48 脚画 48 块 + 96 段文字、选中多一个环、NC 虚线、命中/导航规则），不需要截图比对。
+
+**验证**：headless dump-dom 三个场景（LQFP48 / LQFP32+变体 / TFBGA361），canvas 上 `data-slots=48|32|361`、`data-kind=quad|grid`、`data-renders≥2`（说明绘制跑完没抛错），页面里已无 SVG 引脚元素。
+
 ## 三、待验证（已知风险，未闭环）
 
 | 项 | 现状 | 计划 |

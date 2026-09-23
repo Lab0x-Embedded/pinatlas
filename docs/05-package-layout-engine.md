@@ -114,6 +114,11 @@ io / power / ground / reset / boot / mono / nc / other
 
 ## 8. 实现要点
 
-- 纯函数：`layoutPackage(input) → { slots, meta: { warning[], view, gridRows, gridCols } }`，与 Vue 解耦，便于单测。
-- 视图尺寸用虚拟坐标系（`viewBox`），例如 `0 0 1000 1000`，外部用 CSS 缩放；这样 tooltip 定位和 label 布局不受设备像素影响。
-- 大封装（TFBGA436）只渲染 pad 名，不渲染功能列表；`<title>` + Tooltip 显示前 3 个功能。
+- 纯函数：`layoutPackage(input) → { slots, meta: { kind, view, warnings, pinsPerSide, rows, cols } }`，与 Vue **和渲染方式都解耦**，便于单测。
+- 逻辑坐标系固定 `0..1000`：Canvas 用 `setTransform(dpr*scale, …)` 映射，CSS 尺寸变化只影响 scale，不影响几何计算。
+- **Canvas 渲染**（`utils/canvas-render.ts`）：
+  - 调色板绘制时从 CSS 变量读 → 主题切换重读重绘，不在代码里维护颜色表；
+  - 命中检测 `hitTestSlots()`（矩形点在框内 + slack、球用半径）；
+  - 方向键导航 `neighborSlot()`：四边封装沿当前边顺序移动、垂直方向跳对边同轴向位置（1 号脚按 → 到右列对应行）；网格封装按方向加权找几何邻居；
+  - 渲染函数只依赖最小 ctx 接口 → Node 里用记录式假 ctx 断言绘制调用（`test/canvas-render.spec.ts`）。
+- 大封装（TFBGA436）不画 pad 名（按 `pinsPerSide`/网格半径判断），功能列表放悬停提示（HTML 覆盖层，最多前 3 个 + "还有 N 个"）。

@@ -18,8 +18,7 @@ app/
       ChipInfoCard.vue        flash/ram/IO/订货号
       PackageSwitcher.vue     同一 die 的其它封装（切换 = 换文件）
     pin/
-      PackageDiagram.vue      SVG 容器：接收 layout 结果渲染引脚
-      PinShape.vue            单个引脚矩形/球 + label（可点击、可悬停）
+      PackageDiagram.vue      Canvas 引脚图（尺寸/DPR/主题/命中/键盘都在这里）
       PinDetailPanel.vue      引脚详情：类型、功能分组、AF、变体切换
       FunctionGroup.vue       按外设分组的功能列表
     common/                   shadcn-vue 组件（Button/Card/Input/Badge/Tabs/Separator/…）
@@ -32,6 +31,7 @@ app/
     useTheme.ts               亮/暗主题（class 策略）
   utils/
     package-layout.ts         核心：packageKind → 引脚坐标（见 05）
+    canvas-render.ts          Canvas 绘制 + 调色板（读 CSS 变量）+ 命中检测 + 方向键导航
     pin-types.ts              type → 颜色/中文名/图标
     functions.ts              功能分组、AF 格式化、系统外设过滤
   stores/
@@ -118,7 +118,11 @@ MVP 用**单页工作台**（`app/pages/index.vue`），三栏布局；URL 用 q
 
 ## 6. 无障碍与键鼠
 
-- 引脚图：每个引脚是 `<rect role="button" tabindex="0">`，支持 `Enter/Space` 选中、`←/→/↑/↓` 在相邻引脚间移动（按 position 顺序，不按坐标）。
+- 引脚图是 Canvas，没有 per-pin DOM 节点，代价必须自己补：
+  - 画布本身 `role="img"` + `aria-label`，且 `tabindex="0"` 可聚焦；
+  - `←/→/↑/↓` 用几何找邻居（四边封装沿边走、垂直方向跳对边；网格封装按方向加权），`Enter/Space` 选中；
+  - 选中/移动时把"引脚号 + 名称 + 类型 + 功能数"写进 `aria-live="polite"` 的隐藏区域（屏幕阅读器可读）；
+  - 悬停提示用 HTML 覆盖层渲染，文字不受画布分辨率影响。
 - 搜索：`⌘K`/`Ctrl+K` 聚焦，`↑/↓` 选择，`Enter` 确认，`Esc` 清空。
 - 颜色不作为唯一信息：引脚类型同时用边框样式 + tooltip 文本表达。
 

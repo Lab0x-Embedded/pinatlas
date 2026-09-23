@@ -82,8 +82,14 @@ graph TB
 | 空/错/加载 | 空态给"未收录 + 数据源链接"；错误态给重试；加载用 Skeleton（不要转圈） |
 | AF 未知 | 显示 `—` + 一行说明"该系列上游无 AF 号数据"（**不要显示 AF0**） |
 
-## 5. 引脚图视觉规范
+## 5. 引脚图视觉规范（Canvas 渲染）
 
+渲染方式：**Canvas 2D**（`app/utils/canvas-render.ts`），几何来自纯函数 `layoutPackage()`。
+
+- 画布按 `devicePixelRatio` 放大后在**逻辑坐标系（0..1000）**里作画（`setTransform` 一次），CSS 尺寸随容器走（ResizeObserver）。
+- 颜色**不写死**：绘制时从 CSS 变量读（`--pin-*`、`--border`、`--ring`…），主题切换重读调色板并重绘。
+- 引脚填充用 `globalAlpha 0.18` 的类型色、描边用本色；`nc` 类型用 `setLineDash([6,4])`；图例过滤时其余类型 `globalAlpha 0.22` 变淡。
+- 命中检测、方向键导航都是几何计算（`hitTestSlots` / `neighborSlot`），见 `docs/05 §8`。
 - 引脚矩形：长边 `18px`（quad 沿边）/ 球 `r=9px`（grid）；间距 `4px`；圆角 `radius-sm`。
 - 标注：quad/dual 在矩形外侧标 `position`，内侧标 `pad`（空间不足时只标 position + tooltip）；grid 在球心标 `A1/B7`。
 - Pin 1 标记：右上/左上角一个实心小圆 + 一条加粗边框（**方向必须与数据手册一致**，见 05 §4）。

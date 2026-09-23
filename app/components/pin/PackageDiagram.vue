@@ -184,24 +184,19 @@ const ariaLabel = computed(() =>
   <div class="flex flex-col gap-3">
     <!-- 功能类别过滤：点一下高亮对应引脚（命中加粗、其余淡化），再点取消；计数 0 的禁用不隐藏 -->
     <div class="flex flex-wrap items-center gap-1.5">
-      <button
+      <Button
         v-for="category in categories"
         :key="category.id"
         type="button"
+        :variant="isCategoryActive(category.id) ? 'default' : 'outline'"
         :disabled="category.disabled"
         :title="category.hint"
-        class="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] transition-colors"
-        :class="cn(
-          category.disabled
-            ? 'text-muted-foreground/50 cursor-not-allowed'
-            : 'text-muted-foreground hover:text-foreground',
-          isCategoryActive(category.id) && 'bg-primary text-primary-foreground border-ring',
-        )"
+        class="h-6 gap-1 px-2 text-[11px] font-normal"
         @click="toggleCategory(category.id)"
       >
         {{ category.label }}
-        <span class="tabular-nums">{{ category.count }}</span>
-      </button>
+        <span class="opacity-70 tabular-nums">{{ category.count }}</span>
+      </Button>
     </div>
 
     <div
@@ -390,18 +385,18 @@ const ariaLabel = computed(() =>
 
     <!-- 图例（可点击过滤） -->
     <div class="flex flex-wrap items-center gap-1.5">
-      <button
+      <Button
         v-for="type in PIN_TYPE_ORDER"
         :key="type"
         type="button"
-        class="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] transition-colors"
-        :class="cn(activeType === type && 'bg-primary text-primary-foreground', PIN_TYPE_TEXT[type])"
+        :variant="activeType === type ? 'default' : 'outline'"
+        :class="cn('h-6 gap-1 px-2 text-[11px] font-normal', activeType === type ? '' : PIN_TYPE_TEXT[type])"
         @click="toggleType(type)"
       >
         <span class="size-2 rounded-full border" :class="PIN_TYPE_TEXT[type]" />
         {{ PIN_TYPE_LABEL[type] }}
-        <span class="tabular-nums">{{ typeCount.get(type) ?? 0 }}</span>
-      </button>
+        <span class="opacity-70 tabular-nums">{{ typeCount.get(type) ?? 0 }}</span>
+      </Button>
     </div>
 
     <div class="text-muted-foreground space-y-0.5 text-[11px]">

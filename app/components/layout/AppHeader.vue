@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { buttonVariants } from '~/components/ui/button/variants'
 import { appName, repoUrl } from '~/constants'
+import { DATA_SOURCES, sourceLabel } from '~/constants/data-sources'
 import { strings } from '~/constants/strings'
 import { cn } from '~/lib/utils'
 
@@ -23,14 +24,12 @@ function onKeydown(event: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
-const dataHost = computed(() => {
-  try {
-    return new URL(store.dataBase).host
+/** 数据源下拉：换镜像后 store 会清缓存并按新 host 重拉清单与当前型号 */
+function onDataSourceChange(value: unknown) {
+  if (typeof value === 'string') {
+    void store.setDataSource(value)
   }
-  catch {
-    return store.dataBase
-  }
-})
+}
 </script>
 
 <template>
@@ -59,7 +58,24 @@ const dataHost = computed(() => {
     </div>
 
     <div class="ml-auto flex items-center gap-1">
-      <span class="text-muted-foreground hidden text-xs lg:inline">{{ formatter.format(store.totalChips) }} 个型号 · {{ dataHost }}</span>
+      <span class="text-muted-foreground hidden text-xs lg:inline">{{ formatter.format(store.totalChips) }} 个型号</span>
+      <!-- 数据源（CDN 镜像）切换：不同运营商/地区哪个镜像快差别很大，用户自己切比我们赌一个准 -->
+      <Select :model-value="store.dataSource" @update:model-value="onDataSourceChange">
+        <SelectTrigger :title="store.dataBase" aria-label="数据源 CDN" class="hidden lg:flex">
+          <SelectValue>{{ sourceLabel(store.dataSource) }}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem
+            v-for="source in DATA_SOURCES"
+            :key="source.value"
+            :value="source.value"
+            :hint="source.hint"
+          >
+            <span class="flex-1 truncate">{{ source.label }}</span>
+            <span class="text-muted-foreground text-[10px]">{{ source.value }}</span>
+          </SelectItem>
+        </SelectContent>
+      </Select>
       <ThemeToggle />
       <a
         :href="repoUrl"

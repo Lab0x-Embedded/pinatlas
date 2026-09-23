@@ -1,0 +1,68 @@
+packages: []
+
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+
+autoInstallPeers: false
+
+catalogs:
+  build:
+    '@nuxt/devtools': ^4.0.0-alpha.17
+    '@nuxt/eslint': catalog:build
+    '@nuxt/kit': ^4.5.2
+    '@nuxtjs/color-mode': catalog:build
+    '@pinia/nuxt': catalog:build
+    '@unocss/eslint-config': catalog:build
+    '@unocss/nuxt': catalog:build
+    '@vite-pwa/nuxt': catalog:build
+    '@vueuse/nuxt': catalog:build
+    chokidar: ^5.0.0
+    nuxt: ^4.5.2
+    semver: ^7.8.5
+    unocss: catalog:build
+    unplugin: ^3.3.0
+    vite: ^8.2.2
+  dev:
+    '@antfu/eslint-config': catalog:dev
+    '@types/node': catalog:dev
+    eslint: catalog:dev
+    eslint-plugin-format: catalog:dev
+    eslint-plugin-slop: catalog:dev
+    eslint-plugin-sonarjs: catalog:dev
+    typescript: catalog:dev
+    vue-tsc: catalog:dev
+  frontend:
+    '@vueuse/core': catalog:frontend
+    pinia: catalog:frontend
+    vue: catalog:frontend
+  icons:
+    '@iconify-json/carbon': catalog:icons
+    '@iconify-json/twemoji': catalog:icons
+
+minimumReleaseAge: 0
+
+minimumReleaseAgeExcludePrune: true
+
+overrides:
+  '@nuxt/devtools': catalog:build
+  '@nuxt/kit': catalog:build
+  chokidar: catalog:build
+  nuxt: catalog:build
+  rollup: 4.62.5
+  semver: catalog:build
+  unplugin: catalog:build
+  vite: catalog:build
+  workbox-build: 7.4.0
+
+shamefullyHoist: true
+
+shellEmulator: true
+
+strictPeerDependencies: false
+
+trustPolicy: no-downgrade
+
+update:
+  ignoreDeps:
+    - typescript@7

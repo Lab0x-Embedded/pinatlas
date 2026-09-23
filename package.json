@@ -1,0 +1,42 @@
+{
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@10.22.0+sha512.bf049efe995b28f527fd2b41ae0474ce29186f7edcb3bf545087bd61fbbebb2bf75362d1307fda09c2d288e1e499787ac12d4fcb617a974718a6051f2eee741c",
+  "scripts": {
+    "build": "nuxt build",
+    "dev:pwa": "VITE_PLUGIN_PWA=true nuxt dev",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "prepare": "nuxt prepare",
+    "preview": "nuxt preview",
+    "start": "node .output/server/index.mjs",
+    "start:generate": "npx serve .output/public",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "catalog:dev",
+    "@iconify-json/carbon": "catalog:icons",
+    "@iconify-json/twemoji": "catalog:icons",
+    "@nuxt/devtools": "4.0.0-beta.1",
+    "@nuxt/eslint": "catalog:build",
+    "@nuxtjs/color-mode": "catalog:build",
+    "@pinia/nuxt": "catalog:build",
+    "@types/node": "catalog:dev",
+    "@unocss/eslint-config": "catalog:build",
+    "@unocss/nuxt": "catalog:build",
+    "@vite-pwa/nuxt": "catalog:build",
+    "@vueuse/core": "catalog:frontend",
+    "@vueuse/nuxt": "catalog:build",
+    "eslint": "catalog:dev",
+    "eslint-plugin-format": "catalog:dev",
+    "eslint-plugin-slop": "catalog:dev",
+    "eslint-plugin-sonarjs": "catalog:dev",
+    "nuxt": "^4.5.2",
+    "pinia": "catalog:frontend",
+    "typescript": "catalog:dev",
+    "unocss": "catalog:build",
+    "vue": "catalog:frontend",
+    "vue-tsc": "catalog:dev"
+  }
+}

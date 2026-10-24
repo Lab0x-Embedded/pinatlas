@@ -13,7 +13,7 @@ import { appDescription, appName } from './app/constants/index'
 // 数据（docs/07 §9），曾导致线上 37 个 GPIO 脚渲染成黑块（docs/07 §17）。
 // 数据仓库每次同步后打 `data-YYYY.MM.DD`（同一天第二次发布加 `.N` 后缀），要跟新数据就更新这里的
 // tag，或用 NUXT_PUBLIC_DATA_TAG 覆盖。
-const dataTag = process.env.NUXT_PUBLIC_DATA_TAG || 'data-2026.09.23.3'
+const dataTag = process.env.NUXT_PUBLIC_DATA_TAG || 'data-2026.10.24'
 const dataHost = process.env.NUXT_PUBLIC_DATA_CDN_HOST || 'fastly.jsdelivr.net'
 // jsDelivr 上这份数据集的路径前缀（换 host 时只换前缀，其余拼法不变）
 const dataPath = `/gh/Lab0x-Embedded/pinatlas-data@${dataTag}/data`

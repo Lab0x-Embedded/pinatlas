@@ -19,6 +19,7 @@ export const strings = {
   pinSearchHit: '命中',
   pinSearchNav: '↑↓ 切换命中引脚',
   pinSearchNone: '没有匹配的引脚',
+  rotateDiagram: '旋转引脚图 90°（图内按 R）',
   loadFailed: '数据加载失败',
   retry: '重试',
   pinNumber: '引脚号',

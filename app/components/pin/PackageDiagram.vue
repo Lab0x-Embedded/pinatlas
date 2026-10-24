@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Pin } from '~/types/pinatlas'
-import type { PinSlot } from '~/utils/package-layout'
+import type { PinSide, PinSlot } from '~/utils/package-layout'
 import type { PinCategoryId } from '~/utils/pin-categories'
 import { strings } from '~/constants/strings'
 import { cn } from '~/lib/utils'
@@ -25,10 +25,87 @@ import { functionLabel, PIN_TYPE_FILL, PIN_TYPE_LABEL, PIN_TYPE_ORDER, PIN_TYPE_
  */
 const store = useChipsStore()
 
+/**
+ * 整图旋转（0/90/180/270，按 90° 步进）：几何绕图心旋转，**标签跟着边走但永不倒立**。
+ * 做法：把每个槽位的几何按角度旋转、把 side 映射到旋转后的边，然后标签（引脚名/引脚号）
+ * 按"旋转后的边"用 label-policy 原生排版。转完的图与"原生就按该朝向画的"逐像素一致：
+ * 左右边横排、上下边竖排（rotate −90），任何角度都可读。旋转只影响视图，
+ * 不进 URL/不持久化，切型号不重置。
+ */
+const rotation = ref(0)
+function rotateDiagram() {
+  rotation.value = (rotation.value + 90) % 360
+}
+/** 焦点在图内时按 R 旋转（搜索框在图外，不冲突；带修饰键的组合如 ⌘R 不抢） */
+function onDiagramKeydown(event: KeyboardEvent) {
+  if (event.key.toLowerCase() === 'r' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    rotateDiagram()
+  }
+}
+
+const CENTER = VIEW / 2
+/** 顺时针 90° 后各边落到哪（SVG y 向下，rotate(+90) = 屏幕顺时针） */
+const SIDE_CW: Record<PinSide, PinSide> = { left: 'top', top: 'right', right: 'bottom', bottom: 'left' }
+
+function pointAfter(x: number, y: number): [number, number] {
+  switch (rotation.value) {
+    case 90: return [CENTER * 2 - y, x]
+    case 180: return [CENTER * 2 - x, CENTER * 2 - y]
+    case 270: return [y, CENTER * 2 - x]
+    default: return [x, y]
+  }
+}
+
+/** side 经 N 次 90° 顺时针后的落点边 */
+function sideAfter(side: PinSide): PinSide {
+  let mapped = side
+  for (let step = rotation.value / 90; step > 0; step--) {
+    mapped = SIDE_CW[mapped]
+  }
+  return mapped
+}
+
+/** 槽位几何按角度旋转（矩形重排左上角与宽高；圆只有圆心，r 不变），side 换到落点边 */
+function slotAfter(slot: PinSlot): PinSlot {
+  if (!rotation.value) {
+    return slot
+  }
+  const [cx, cy] = pointAfter(slot.cx, slot.cy)
+  let x = 0
+  let y = 0
+  let w = slot.w
+  let h = slot.h
+  switch (rotation.value) {
+    case 90:
+      x = CENTER * 2 - (slot.y + slot.h)
+      y = slot.x
+      w = slot.h
+      h = slot.w
+      break
+    case 180:
+      x = CENTER * 2 - (slot.x + slot.w)
+      y = CENTER * 2 - (slot.y + slot.h)
+      break
+    default:
+      x = slot.y
+      y = CENTER * 2 - (slot.x + slot.w)
+      w = slot.h
+      h = slot.w
+      break
+  }
+  return { ...slot, x, y, w, h, cx, cy, side: slot.side ? sideAfter(slot.side) : undefined }
+}
+
 const layout = computed(() => layoutPackage({
   kind: store.chip?.packageKind ?? 'unknown',
   pins: store.effectivePins,
 }))
+
+/** 旋转后的槽位（块/球/文字都从这份渲染） */
+const slotsView = computed(() => layout.value.slots.map(slotAfter))
+
+/** pin 1 圆点跟着转（判断朝向的锚点，必须与几何一致） */
+const pin1Dot = computed(() => pointAfter(bodyRect.x + 34, bodyRect.y + 34))
 
 const pinsByPosition = computed(() => new Map(store.effectivePins.map(pin => [pin.position, pin])))
 
@@ -94,6 +171,42 @@ const rowCenters = computed(() => {
     map.set(slot.position.replace(/\d+$/, ''), slot.cy)
   }
   return map
+})
+
+/** 坐标头锚点类型按"锚点所在的边"取：左右两端朝外延伸（end/start），上下居中（middle） */
+const HEADER_ANCHOR: Record<PinSide, 'start' | 'middle' | 'end'> = {
+  left: 'end',
+  right: 'start',
+  top: 'middle',
+  bottom: 'middle',
+}
+
+/**
+ * 网格坐标头（旋转感知）：先按原始位置算锚点，再随整图旋转锚点、按落点边换锚点类型，
+ * 文字本身保持水平（单个字母/数字，竖排反而难读）。
+ */
+const axisHeaders = computed(() => {
+  if (layout.value.meta.kind !== 'grid') {
+    return []
+  }
+  const font = policy.value.axisFont
+  const entries: Array<{ key: string, text: string, x: number, y: number, anchor: 'start' | 'middle' | 'end' }> = []
+  const push = (key: string, text: string, x: number, y: number, side: PinSide) => {
+    // 锚点带原始的基线偏移随图旋转；文字保持水平，锚点类型按旋转后落点所在的边取
+    const [rx, ry] = pointAfter(x, y)
+    entries.push({ key, text, x: rx, y: ry, anchor: HEADER_ANCHOR[sideAfter(side)] })
+  }
+  for (const label of rowLabels.value) {
+    const cy = rowCenters.value.get(label) ?? 0
+    push(`row-${label}`, label, bodyRect.x - 12, cy + font * 0.35, 'left')
+    push(`row-r-${label}`, label, bodyRect.x + bodyRect.width + 12, cy + font * 0.35, 'right')
+  }
+  for (const col of colNumbers.value) {
+    const cx = colCenters.value.get(col) ?? 0
+    push(`col-${col}`, String(col), cx, bodyRect.y - font * 0.4, 'top')
+    push(`col-b-${col}`, String(col), cx, bodyRect.y + bodyRect.height + font * 1.15, 'bottom')
+  }
+  return entries
 })
 
 function pinClass(slot: PinSlot) {
@@ -187,7 +300,7 @@ function onMove(event: MouseEvent) {
 const hoveredPin = computed(() => (hover.value ? pinsByPosition.value.get(hover.value.position) : null))
 
 const ariaLabel = computed(() =>
-  `${store.chip?.package ?? ''} 引脚图，共 ${store.effectivePins.length} 脚`)
+  `${store.chip?.package ?? ''} 引脚图，共 ${store.effectivePins.length} 脚${rotation.value ? `，已旋转 ${rotation.value}°` : ''}`)
 </script>
 
 <template>
@@ -213,7 +326,23 @@ const ariaLabel = computed(() =>
         class="relative mx-auto w-full max-w-[860px]"
         @mousemove="onMove"
         @mouseleave="hover = null"
+        @keydown="onDiagramKeydown"
       >
+        <!-- 旋转：90° 步进循环；焦点在图内时也可按 R -->
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          class="absolute top-2 right-2 z-10 rounded-full bg-background/80 backdrop-blur"
+          :title="`${strings.rotateDiagram}${rotation ? `（当前 ${rotation}°）` : ''}`"
+          :aria-label="strings.rotateDiagram"
+          @click="rotateDiagram"
+        >
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <path d="M21 3v6h-6" />
+          </svg>
+        </Button>
         <svg
           :viewBox="`0 0 ${VIEW} ${VIEW}`"
           class="h-auto w-full select-none"
@@ -223,7 +352,7 @@ const ariaLabel = computed(() =>
           :data-kind="layout.meta.kind"
           :data-number-font="policy.numberFont.toFixed(1)"
         >
-          <!-- 封装本体 -->
+          <!-- 封装本体（正方形居中，90° 步进旋转下形状不变） -->
           <rect
             :x="bodyRect.x"
             :y="bodyRect.y"
@@ -233,11 +362,16 @@ const ariaLabel = computed(() =>
             class="fill-muted/40 stroke-border"
             stroke-width="3"
           />
-          <!-- pin 1 标记（左上角，与数据手册一致：俯视逆时针） -->
-          <circle :cx="bodyRect.x + 34" :cy="bodyRect.y + 34" r="11" class="fill-foreground" />
+          <!-- pin 1 标记（随整图旋转：它是朝向的锚点） -->
+          <circle :cx="pin1Dot[0]" :cy="pin1Dot[1]" r="11" class="fill-foreground" />
 
-          <!-- 本体中心的丝印：型号 + 封装/引脚数（与实物芯片顶面一致；网格封装的球会盖住，不放） -->
-          <g v-if="centerMark" text-anchor="middle" :data-center="centerMark.title">
+          <!-- 本体中心的丝印：型号 + 封装/引脚数。跟着芯片一起转（实物丝印就印在顶面） -->
+          <g
+            v-if="centerMark"
+            text-anchor="middle"
+            :transform="rotation ? `rotate(${rotation} ${centerMark.x} ${centerMark.titleY})` : undefined"
+            :data-center="centerMark.title"
+          >
             <text
               :x="centerMark.x"
               :y="centerMark.titleY"
@@ -252,44 +386,20 @@ const ariaLabel = computed(() =>
             >{{ centerMark.subtitle }}</text>
           </g>
 
-          <!-- 网格封装的外围坐标头：球号画不下时靠它读位置（BGA 数据手册也是这么标的） -->
+          <!-- 网格封装的外围坐标头：锚点随图旋转、文字保持水平（axisHeaders 已按落点边选好锚点类型） -->
           <g v-if="layout.meta.kind === 'grid'" class="fill-muted-foreground">
             <text
-              v-for="label in rowLabels"
-              :key="`row-${label}`"
-              :x="bodyRect.x - 12"
-              :y="(rowCenters.get(label) ?? 0) + policy.axisFont * 0.35"
-              text-anchor="end"
+              v-for="header in axisHeaders"
+              :key="header.key"
+              :x="header.x"
+              :y="header.y"
+              :text-anchor="header.anchor"
               :font-size="policy.axisFont"
-            >{{ label }}</text>
-            <text
-              v-for="label in rowLabels"
-              :key="`row-r-${label}`"
-              :x="bodyRect.x + bodyRect.width + 12"
-              :y="(rowCenters.get(label) ?? 0) + policy.axisFont * 0.35"
-              text-anchor="start"
-              :font-size="policy.axisFont"
-            >{{ label }}</text>
-            <text
-              v-for="col in colNumbers"
-              :key="`col-${col}`"
-              :x="colCenters.get(col) ?? 0"
-              :y="bodyRect.y - policy.axisFont * 0.4"
-              text-anchor="middle"
-              :font-size="policy.axisFont"
-            >{{ col }}</text>
-            <text
-              v-for="col in colNumbers"
-              :key="`col-b-${col}`"
-              :x="colCenters.get(col) ?? 0"
-              :y="bodyRect.y + bodyRect.height + policy.axisFont * 1.15"
-              text-anchor="middle"
-              :font-size="policy.axisFont"
-            >{{ col }}</text>
+            >{{ header.text }}</text>
           </g>
 
           <g
-            v-for="slot in layout.slots"
+            v-for="slot in slotsView"
             :key="slot.position"
             class="cursor-pointer outline-none"
             role="button"

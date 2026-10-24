@@ -8,6 +8,10 @@ const store = useChipsStore()
 
 const formatter = new Intl.NumberFormat('en-US')
 const expanded = ref<Set<string>>(new Set())
+/** 已展开的厂商（多厂商数据才有这一层；单厂商时菜单不渲染厂商行） */
+const expandedVendors = ref<Set<string>>(new Set())
+
+const multiVendor = computed(() => store.vendorGroups.length > 1)
 
 /** 每组"展开其余"的 line 集合 */
 const uncapped = ref<Set<string>>(new Set())
@@ -72,6 +76,17 @@ function toggle(family: string) {
     void store.ensureShard(family)
   }
   expanded.value = next
+}
+
+function toggleVendor(vendor: string) {
+  const next = new Set(expandedVendors.value)
+  if (next.has(vendor)) {
+    next.delete(vendor)
+  }
+  else {
+    next.add(vendor)
+  }
+  expandedVendors.value = next
 }
 
 /**
@@ -143,7 +158,7 @@ onBeforeUnmount(() => {
   clearTimeout(shardTimer)
 })
 
-/** 当前型号所在系列自动展开 */
+/** 当前型号所在的厂商与系列自动展开（深链/默认型号进多厂商清单时不至于只看到一排厂商行） */
 watch(() => store.currentChipId, (id) => {
   if (!id) {
     return
@@ -154,6 +169,14 @@ watch(() => store.currentChipId, (id) => {
     next.add(family)
     expanded.value = next
     void store.ensureShard(family)
+  }
+  if (multiVendor.value) {
+    const vendor = store.vendorForChip(id)
+    if (vendor && !expandedVendors.value.has(vendor)) {
+      const next = new Set(expandedVendors.value)
+      next.add(vendor)
+      expandedVendors.value = next
+    }
   }
 })
 
@@ -183,7 +206,7 @@ function chipIdParts(match: ChipSearchMatch) {
       </h2>
       <span class="text-muted-foreground text-xs tabular-nums">
         <template v-if="searching">{{ formatter.format(store.searchMatches.length) }} / {{ formatter.format(store.totalChips) }}</template>
-        <template v-else>{{ store.loadedFamilies.length }} / {{ store.families.length }} 系列</template>
+        <template v-else>{{ multiVendor ? `${store.vendorGroups.length} 厂商 · ` : '' }}{{ store.loadedFamilies.length }} / {{ store.families.length }} 系列</template>
       </span>
     </div>
 
@@ -271,58 +294,35 @@ function chipIdParts(match: ChipSearchMatch) {
       </p>
     </div>
 
-    <!-- 系列树：未加载的系列只显示计数，展开才拉数据 -->
+    <!-- 系列树：未加载的系列只显示计数，展开才拉数据。
+         多厂商清单在系列外面再包一层厂商行（厂商从分片路径推导，不需要数据侧加字段）；
+         只有一家厂商时不渲染厂商层，菜单与原来完全一致 -->
     <div v-else class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-      <div v-for="group in store.familyGroups" :key="group.family" class="mb-1">
+      <div v-for="vendor in store.vendorGroups" :key="vendor.vendor">
         <Button
+          v-if="multiVendor"
           type="button"
           variant="ghost"
-          class="h-auto w-full justify-start gap-2 rounded-md px-2 py-1.5 text-left font-normal"
-          @click="toggle(group.family)"
+          class="h-auto w-full justify-start gap-2 rounded-md px-2 py-1.5 text-left"
+          @click="toggleVendor(vendor.vendor)"
         >
           <svg
             class="text-muted-foreground size-3 shrink-0 transition-transform"
-            :class="expanded.has(group.family) && 'rotate-90'"
+            :class="expandedVendors.has(vendor.vendor) && 'rotate-90'"
             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"
           >
             <path d="m9 6 6 6-6 6" />
           </svg>
-          <span class="flex-1 truncate text-sm">{{ group.family }}</span>
-          <span v-if="group.loading" class="border-border size-3 animate-spin rounded-full border-2 border-t-transparent" />
-          <span v-else class="text-muted-foreground text-[11px] tabular-nums">{{ group.count }}</span>
+          <span class="flex-1 truncate text-sm" :title="store.vendorLabel(vendor.vendor)">{{ store.vendorLabel(vendor.vendor) }}</span>
+          <span class="text-muted-foreground shrink-0 text-[11px] tabular-nums">{{ vendor.familyCount }} 系列 · {{ formatter.format(vendor.count) }}</span>
         </Button>
-
-        <div v-if="expanded.has(group.family)" class="mt-0.5 ml-3 border-l pl-2">
-          <template v-if="group.loaded">
-            <div v-for="lineGroup in store.groupedChips.filter(g => group.chips.some(c => c.line === g.line))" :key="lineGroup.line">
-              <p class="text-foreground/75 border-border/60 mt-2 mb-0.5 truncate border-b px-2 pb-1 text-xs font-semibold tracking-wide" :title="lineGroup.line">
-                {{ lineGroup.line }}
-                <span class="text-muted-foreground font-normal tabular-nums">· {{ lineGroup.chips.length }}</span>
-              </p>
-              <ul class="space-y-0.5">
-                <li v-for="entry in lineGroup.chips" :key="entry.chip">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    :title="entry.displayName"
-                    :class="cn(
-                      'h-auto w-full flex-col items-stretch justify-start gap-0 rounded-md px-2 py-1.5 text-left whitespace-normal',
-                      store.currentChipId === entry.chip ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
-                    )"
-                    @click="store.selectChip(entry.chip)"
-                  >
-                    <span class="block truncate text-sm">{{ entry.chip }}</span>
-                    <span class="text-muted-foreground block truncate text-[11px]">{{ chipSubtitle(entry) }}</span>
-                  </Button>
-                </li>
-              </ul>
-            </div>
-          </template>
-          <div v-else class="space-y-1 px-2 py-2">
-            <Skeleton class="h-6 w-full" />
-            <Skeleton class="h-6 w-5/6" />
-          </div>
-        </div>
+        <ChipFamilyTree
+          v-if="!multiVendor || expandedVendors.has(vendor.vendor)"
+          :families="vendor.families"
+          :expanded="expanded"
+          :class="multiVendor && 'mt-0.5 ml-3 border-l pl-2'"
+          @toggle="toggle"
+        />
       </div>
     </div>
   </div>

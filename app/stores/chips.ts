@@ -1,10 +1,11 @@
-import type { ChipDoc, ChipIndexEntry, DatasetManifest, FamilyShard, Pin } from '~/types/pinatlas'
+import type { ChipDoc, ChipIndexEntry, DatasetManifest, FamilyGroupItem, FamilyShard, Pin, ShardMeta, VendorGroupItem } from '~/types/pinatlas'
 import type { ChipSearchMatch } from '~/utils/chip-search'
 import { buildDataBase, DATA_HOST_STORAGE_KEY, DATA_SOURCES, hostOf } from '~/constants/data-sources'
 import { searchChips } from '~/utils/chip-search'
 import { fetchJson } from '~/utils/http'
 import { searchPins } from '~/utils/pin-search'
 import { normalizePins } from '~/utils/pin-types'
+import { groupByVendor, vendorLabel as labelOfVendor, vendorOfShardPath } from '~/utils/vendor-groups'
 
 /**
  * 数据集与当前选中状态。
@@ -70,20 +71,48 @@ export const useChipsStore = defineStore('chips', () => {
   /** 已加载的系列（含芯片数据） */
   const loadedChips = computed(() => Object.values(shards.value).flat())
   const loadedFamilies = computed(() => Object.keys(shards.value))
-  const families = computed(() => manifest.value?.shards ?? [])
+
+  /**
+   * 全部分片（带厂商归属）。v1.4.0 起清单按厂商分节，顶层 `shards` 只是 st 的旧版镜像，
+   * 多厂商必须读 `vendors.{slug}.shards`；旧清单没有分节，走顶层 shards + 路径推导。
+   */
+  const families = computed<Array<ShardMeta & { vendor: string }>>(() => {
+    const sections = manifest.value?.vendors
+    if (sections && Object.keys(sections).length > 0) {
+      return Object.entries(sections).flatMap(([slug, section]) =>
+        section.shards.map(shard => ({ ...shard, vendor: slug })))
+    }
+    return (manifest.value?.shards ?? []).map(shard => ({
+      ...shard,
+      vendor: vendorOfShardPath(shard.path) ?? manifest.value?.vendor ?? 'other',
+    }))
+  })
+
   const allLoaded = computed(() =>
     families.value.length > 0 && loadedFamilies.value.length >= families.value.length)
-  const totalChips = computed(() =>
-    manifest.value?.totals?.chips ?? manifest.value?.shards.reduce((sum, s) => sum + s.count, 0) ?? 0)
+  const totalChips = computed(() => {
+    const sections = manifest.value?.vendors
+    if (sections && Object.keys(sections).length > 0) {
+      return Object.values(sections).reduce((sum, s) => sum + (s.totals?.chips ?? 0), 0)
+    }
+    return manifest.value?.totals?.chips ?? manifest.value?.shards.reduce((sum, s) => sum + s.count, 0) ?? 0
+  })
 
-  /** 左栏：系列 → 型号（未加载的系列只显示计数） */
-  const familyGroups = computed(() => families.value.map(shard => ({
+  /** 左栏：系列 → 型号（未加载的系列只显示计数）。vendor 已随 families 带上（分节或路径推导） */
+  const familyGroups = computed<FamilyGroupItem[]>(() => families.value.map(shard => ({
     family: shard.family,
+    vendor: shard.vendor,
     count: shard.count,
     loaded: Boolean(shards.value[shard.family]),
     loading: loadingFamilies.value.has(shard.family),
     chips: shards.value[shard.family] ?? [],
   })))
+
+  /**
+   * 左栏厂商分组（docs/02 §6）：多厂商数据里系列不再被字母序混排。
+   * 只有一家厂商时侧栏不渲染厂商层，菜单与原来完全一致。
+   */
+  const vendorGroups = computed<VendorGroupItem[]>(() => groupByVendor(familyGroups.value))
 
   /**
    * 搜索结果（多词 AND + 相关度排序 + 高亮区间），见 `~/utils/chip-search`。
@@ -234,6 +263,20 @@ export const useChipsStore = defineStore('chips', () => {
       .filter(family => chipId.startsWith(family))
       .sort((a, b) => b.length - a.length)
     return candidates[0] ?? null
+  }
+
+  /** 型号所在厂商（侧栏自动展开厂商层用）；找不到返回 null */
+  function vendorForChip(chipId: string): string | null {
+    const family = familyForChip(chipId)
+    if (!family) {
+      return null
+    }
+    return familyGroups.value.find(group => group.family === family)?.vendor ?? null
+  }
+
+  /** 厂商展示名：清单分节的 `vendorName`（数据仓库 config 维护）优先，兜底大写厂商码 */
+  function vendorLabel(vendor: string): string {
+    return labelOfVendor(vendor, manifest.value?.vendors?.[vendor]?.vendorName)
   }
 
   async function loadManifest(force = false) {
@@ -444,6 +487,7 @@ export const useChipsStore = defineStore('chips', () => {
     manifest,
     families,
     familyGroups,
+    vendorGroups,
     shards,
     loadedFamilies,
     loadingFamilies,
@@ -478,6 +522,8 @@ export const useChipsStore = defineStore('chips', () => {
     selectPinHit,
     clearPinSearch,
     familyForChip,
+    vendorForChip,
+    vendorLabel,
     loadManifest,
     ensureShard,
     ensureAllShards,

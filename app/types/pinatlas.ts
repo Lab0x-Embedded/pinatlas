@@ -1,7 +1,8 @@
 /** PinAtlas 统一数据契约的类型定义（对应 pinatlas-data 的 docs/unified-schema.md v1.1.0）。 */
 
 export type PinType = 'gpio' | 'power' | 'ground' | 'reset' | 'boot' | 'clock' | 'mono' | 'nc' | 'other'
-export type PackageKind = 'quad' | 'dual' | 'grid' | 'unknown'
+/** v1.4.0 新增 `module`（ESP32 WROOM/MINI 类贴片模组）；布局引擎未覆盖时按 unknown 兜底 */
+export type PackageKind = 'quad' | 'dual' | 'grid' | 'module' | 'unknown'
 /** 功能大类（分组用；原始 peripheral 名始终保留） */
 export type FunctionType = 'adc' | 'timer' | 'spi' | 'i2c' | 'uart' | 'can' | 'usb' | 'exti' | 'system' | 'other'
 
@@ -101,11 +102,50 @@ export interface FamilyShard {
   chips: ChipIndexEntry[]
 }
 
+/** 清单里的分片表项 */
+export interface ShardMeta {
+  family: string
+  count: number
+  path: string
+}
+
+/** v1.4.0 起清单按厂商分节；顶层 shards 只是 st 的旧版镜像，多厂商必须读分节 */
+export interface VendorSection {
+  vendor: string
+  /** 展示名（config.vendors[].vendorName），侧栏厂商层用它 */
+  vendorName?: string | null
+  upstream?: Record<string, unknown> | null
+  totals?: { chips: number, pins: number, afSlots: number, afCoverage: number } | null
+  afCount?: number
+  shards: ShardMeta[]
+}
+
 export interface DatasetManifest {
   schemaVersion: string
   generatedAt?: string
+  /** 单厂商时期的遗留字段；多厂商数据里它只是 st 节的镜像，不可信 */
   vendor: string
+  /** 厂商分节（v1.4.0 起）；旧清单没有，走顶层 shards + 路径推导厂商 */
+  vendors?: Record<string, VendorSection>
   upstream?: Record<string, unknown>
   totals?: { chips: number, pins: number, afSlots: number, afCoverage: number }
-  shards: { family: string, count: number, path: string }[]
+  shards: ShardMeta[]
+}
+
+/** 左栏系列组（store.familyGroups 的元素；vendor 来自清单分节或分片路径推导） */
+export interface FamilyGroupItem {
+  family: string
+  vendor: string
+  count: number
+  loaded: boolean
+  loading: boolean
+  chips: ChipIndexEntry[]
+}
+
+/** 左栏厂商组（store.vendorGroups 的元素；只有一家厂商时前端不渲染厂商层） */
+export interface VendorGroupItem {
+  vendor: string
+  families: FamilyGroupItem[]
+  familyCount: number
+  count: number
 }
